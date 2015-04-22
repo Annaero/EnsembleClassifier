@@ -3,13 +3,8 @@ import sys
 from math import sqrt
 import os.path
 import matplotlib.pyplot as plt
-from functools import reduce
-from sklearn import svm
-from nbaes import NBaes
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error
 from sklearn import preprocessing
-import random
 import numpy as np
 from scipy.stats import norm
 
@@ -125,10 +120,8 @@ if __name__ == "__main__":
         lm.fit(Xs, rmses[1:learnCnt])
     
     def best_predict(Xs, lms, prev):
-        cfs = transition_matrix[prev] if prev >=0 else [1] * 7      
-       # lms = 
+        cfs = transition_matrix[prev] if prev >=0 else [1] * 7       
         p_rmses = [( lm.predict(Xs) * cf )  for lm, cf in zip(lms, cfs)]
-        #print(p_rmses)
         min_p_rmse = min(p_rmses)
         return p_rmses.index(min_p_rmse)
 

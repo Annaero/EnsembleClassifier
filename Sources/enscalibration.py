@@ -16,6 +16,8 @@ from dtw import dtw
 from dateutil.rrule import rrule, HOURLY
 from sklearn import linear_model
 
+from itertools import product
+
 #MODELS = ["BALTP_FORCE_2m", "BALTP_FORCE_90m", "BALTP_GFS60_2m", 
 #          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP_HIRLAM_2m",
 #          "BALTP-90M-GFS", "BALTP-90M-HIRLAM", "BSM_FORCE_BankeSmithAss",
@@ -66,7 +68,7 @@ def read_predictions(path, model, point):
     filePath = os.path.join(path, point, "{0}-{1}.txt".format(model, point))  
     
     times = list()
-    predictions = dict()    
+    predictions = OrderedDict()    
     with open(filePath) as modelFile:
         for line in modelFile:
             if model not in TABED_MODELS:
@@ -82,17 +84,8 @@ def read_predictions(path, model, point):
             predictions[dt] = [float(l) for l in pr]
             predictLen = len(tokens[2:])
     return predictions, times, predictLen
-            
-def RMSE(predicted, actual):
-    rootErr = sum([ (p-a)**2 for p,a in zip(predicted, actual)]) / len(predicted)   
-    return sqrt(rootErr)
     
-def dist_mesurement(predicted, actual):
-    dist, cost, path = dtw(predicted, actual)
-    return dist
-    #return RMSE(predicted, actual)
-    
-def get_combinations(models):
+#def get_combinations(models):
     
     
 if __name__ == "__main__":
@@ -132,12 +125,24 @@ if __name__ == "__main__":
         target.extend(S1[msmIndex : msmIndex + minPredLen])
         
     #predictors.append([1] * len(predictors[0]))
-
-    lm = linear_model.LinearRegression(normalize = True)
-    lm.fit(list(zip(*predictors)), target)
-    lm.get_params() 
+        
     
-    lm.predict
+    
+    print(*MODELS)
+    for ens_coef in product([1,0], repeat = len(MODELS)):
+        lm = linear_model.LinearRegression()
+        
+        ensemble_predictors = \
+                [[a*b for a,b in zip(point, ens_coef)] for point in zip(*predictors)]   
+        lm.fit(ensemble_predictors, target)
+        lm.get_params() 
+        
+        lm.predict
+    
+        coefs = list(lm.coef_) + [lm.intercept_]
+        form_str = " ".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
+        print(form_str.format(*coefs))
+        print()
     
     ### list(itertools.product([1,0], repeat=4))
         
