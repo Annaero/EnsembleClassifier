@@ -43,9 +43,10 @@ def RMSE(predicted, actual):
     return sqrt(rootErr)
     
 def DistMesurement(predicted, actual):
-    dist, cost, path = dtw(predicted, actual)
-    return dist
-    #return RMSE(predicted, actual)
+    #ln = min(len(predicted), len(actual))
+    #dist, cost, path = dtw(predicted[:ln], actual[:ln])
+    #return dist
+    return RMSE(predicted, actual)
 
 #TODO: 
         

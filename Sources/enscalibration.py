@@ -7,6 +7,7 @@ Created on Sun Mar 22 17:05:18 2015
 import pickle
 import sys
 import os.path
+import os
 import matplotlib.pyplot as pyplot
 
 from collections import OrderedDict
@@ -61,7 +62,8 @@ def read_meserments(path, fileName):
     
 def get_msm_index(dt):
     tdelta = dt - MSM_BEGINING
-    return int(tdelta.seconds / 3600)
+    #print(tdelta.total_seconds())
+    return int(tdelta.total_seconds() / 3600)
     
 def read_predictions(path, model, point):  
     print(model)
@@ -90,6 +92,7 @@ def read_predictions(path, model, point):
     
 if __name__ == "__main__":
     path = sys.argv[1]
+    path_to_aligned = sys.argv[2]
     
     GRN, S1 = read_meserments(path, \
         "GI_C1NB_C1FG_SHEP_restored_20130901000000_01.txt")
@@ -122,6 +125,7 @@ if __name__ == "__main__":
                 in zip([prd[tm] for prd in modelsPredictions], predictors):
             predictor.extend(currentPrediction[:minPredLen])
         msmIndex = get_msm_index(tm)
+        print(len(S1[msmIndex : msmIndex + minPredLen]))
         target.extend(S1[msmIndex : msmIndex + minPredLen])
         
     #predictors.append([1] * len(predictors[0]))
@@ -140,9 +144,31 @@ if __name__ == "__main__":
         lm.predict
     
         coefs = list(lm.coef_) + [lm.intercept_]
-        form_str = " ".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
+        form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
         print(form_str.format(*coefs))
-        print()
+        
+        
+    for model, predictions in zip(MODELS, modelsPredictions):
+        if not os.path.exists(path_to_aligned):
+            os.makedirs(path_to_aligned)
+            
+        with open(os.path.join(path_to_aligned, model), "w+") as aligned_model_file:
+            for tm in times:
+                predStr = "\t".join([str(p) for p in predictions[tm]])
+                aligned_model_file.write(predStr)
+                aligned_model_file.write("\n")
+                
+    
+    with open(os.path.join(path_to_aligned, "mesur"), "w+") as aligned_mes_file:
+        print(times[0])
+        print(times[-1])
+        print(get_msm_index(times[0]))
+        print(get_msm_index(times[-1]))
+        msms = S1[get_msm_index(times[0]):get_msm_index(times[-1])]
+        msms_str = "\n".join([str(m) for m in msms])        
+        aligned_mes_file.write(msms_str)
+           # aligned_model_file.write("\n")
+        
     
     ### list(itertools.product([1,0], repeat=4))
         
