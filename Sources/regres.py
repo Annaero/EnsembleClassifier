@@ -8,7 +8,6 @@ from sklearn import preprocessing
 import numpy as np
 from scipy.stats import norm
 
-
 from dtw import dtw
 
 def read_data(fileName):
@@ -43,15 +42,16 @@ def RMSE(predicted, actual):
     return sqrt(rootErr)
     
 def DistMesurement(predicted, actual):
-    #ln = min(len(predicted), len(actual))
-    #dist, cost, path = dtw(predicted[:ln], actual[:ln])
-    #return dist
-    return RMSE(predicted, actual)
+    ln = min(len(predicted), len(actual))
+    dist, cost, path = dtw(predicted[:ln], actual[:ln])
+    return dist
+#    return RMSE(predicted, actual)
 
 #TODO: 
         
 if __name__ == "__main__":
     path = sys.argv[1]
+    path2 = sys.argv[2]
 
     measurementsFile = os.path.join(path, "2011080100_measurements_S1_2623.txt")
     noswanFile = os.path.join(path, "2011080100_noswan_S1_48x434.txt")
@@ -73,14 +73,14 @@ if __name__ == "__main__":
     rmseByEns = list()
     for coeffs in read_ens_coeffs(coeffsFile):
         ensCount += 1
-        rmses = list()    
+        rmses = list()
         for i in range(cnt):
             ensembles = [hiromb[i], swan[i], noswan[i], add]
             predicted = ensemble_predict(ensembles, coeffs)
             actual = meserments[i*6 + 1:]
             rmses.append(DistMesurement(predicted, actual))
         rmseByEns.append(rmses)
-    rmseByTime = zip(*rmseByEns) 
+    rmseByTime = zip(*rmseByEns)
  
     learnCnt = 320 
  
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     #meserments = preprocessing.normalize(meserments, norm='l2')
             
     def get_x(i):
-        fst = i * 6 - 5
+        fst = i * 6 - 1
         end = i * 6
         msm = meserments[fst : end+1]     
         X = msm
@@ -121,7 +121,7 @@ if __name__ == "__main__":
         lm.fit(Xs, rmses[1:learnCnt])
     
     def best_predict(Xs, lms, prev):
-        cfs = transition_matrix[prev] if prev >=0 else [1] * 7       
+        cfs = [1]*7#transition_matrix[prev] if prev >=0 else [1] * 7       
         p_rmses = [( lm.predict(Xs) * cf )  for lm, cf in zip(lms, cfs)]
         min_p_rmse = min(p_rmses)
         return p_rmses.index(min_p_rmse)
@@ -155,10 +155,9 @@ if __name__ == "__main__":
     mlL, = plt.plot(range(learnCnt, cnt), mlPred, "c-", label = "classified {:.3}".format(mean))
     
     plt.legend(handles=[ensL, bestL, mlL])
-    plt.savefig(os.path.join(path, "S1_fig3_DTW_100_by5.png"))
+    plt.savefig(os.path.join(path2, "S1_fig3_DTW_100_by4.png"))
     plt.show()
     plt.close()
-    
     
     binsc = 20
     plt.figure(figsize=(15,10))
@@ -169,7 +168,7 @@ if __name__ == "__main__":
     plt.hist(bestPred, bins, color='green' ,normed=1, alpha=0.4, histtype='bar', label="best")
     plt.hist(mlPred, bins, color='red', normed=1, alpha=1, histtype='step', label="ml")
     
-    plt.savefig(os.path.join(path, "S1_fig4_DTW_100_by5.png"))
+    plt.savefig(os.path.join(path2, "S1_fig4_DTW_100_by4.png"))
     plt.show()
     plt.close()
     
@@ -189,7 +188,7 @@ if __name__ == "__main__":
     mlL, =  plt.plot(x, pdf_f, color='red', label="predicted")
 
     plt.legend(handles=[ensL, bestL, mlL])
-    plt.savefig(os.path.join(path, "S1_fig5_DTW_100_by5.png"))
+    plt.savefig(os.path.join(path2, "S1_fig5_DTW_100_by4.png"))
 
     plt.show()
     plt.close()

@@ -33,7 +33,7 @@ TABED_MODELS = ["BSM-BS-HIRLAM", "BALTP-90M-GFS", "BALTP-90M-HIRLAM",
 #          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP-90M-GFS",
 #          "BSM_FORCE_WowcSwanAss", "BSM-BS-HIRLAM"]
 
-MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
+MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m"]#, "HIROMB"]
           
           
 DTFORMAT = "%Y-%m-%d %H:%M:%S"
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     modelTimes = list()
     predictLengths = list()
     for model in MODELS:
-        predictions, times, predictLen = read_predictions(path, model, "S1")
+        predictions, times, predictLen = read_predictions(path, model, "GRN")
         modelsPredictions.append(predictions)
         modelTimes.append(times)
         predictLengths.append(predictLen)
@@ -121,31 +121,34 @@ if __name__ == "__main__":
     predictors = [list() for mdl in MODELS]
     target = list()
     for tm in times:
+        msmIndex = get_msm_index(tm)
+        msm = GRN[msmIndex : msmIndex + minPredLen]
+        target_len = len(msm)
+        
         for currentPrediction, predictor \
                 in zip([prd[tm] for prd in modelsPredictions], predictors):
-            predictor.extend(currentPrediction[:minPredLen])
-        msmIndex = get_msm_index(tm)
-        print(len(S1[msmIndex : msmIndex + minPredLen]))
-        target.extend(S1[msmIndex : msmIndex + minPredLen])
+            predictor.extend(currentPrediction[:target_len])
+        target.extend(msm)
         
     #predictors.append([1] * len(predictors[0]))
         
-    
-    
     print(*MODELS)
-    for ens_coef in product([1,0], repeat = len(MODELS)):
-        lm = linear_model.LinearRegression()
+    with open(os.path.join(path_to_aligned, "ens_coef.txt"), "w+") as ens_coef_file:
+        for ens_map in product([1,0], repeat = len(MODELS)):
+            lm = linear_model.LinearRegression()
+            
+            ensemble_predictors = \
+                    [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]   
+            lm.fit(ensemble_predictors, target)
+            lm.get_params() 
+            
+            lm.predict
         
-        ensemble_predictors = \
-                [[a*b for a,b in zip(point, ens_coef)] for point in zip(*predictors)]   
-        lm.fit(ensemble_predictors, target)
-        lm.get_params() 
-        
-        lm.predict
-    
-        coefs = list(lm.coef_) + [lm.intercept_]
-        form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
-        print(form_str.format(*coefs))
+            coefs = list(lm.coef_) + [lm.intercept_]
+            form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
+            coef_str = form_str.format(*coefs)
+            ens_coef_file.write(coef_str+"\n")
+            print(coef_str)
         
         
     for model, predictions in zip(MODELS, modelsPredictions):
@@ -164,7 +167,7 @@ if __name__ == "__main__":
         print(times[-1])
         print(get_msm_index(times[0]))
         print(get_msm_index(times[-1]))
-        msms = S1[get_msm_index(times[0]):get_msm_index(times[-1])]
+        msms = GRN[get_msm_index(times[0]):get_msm_index(times[-1])]
         msms_str = "\n".join([str(m) for m in msms])        
         aligned_mes_file.write(msms_str)
            # aligned_model_file.write("\n")
