@@ -8,6 +8,9 @@ from sklearn import preprocessing
 import numpy as np
 from scipy.stats import norm
 
+from sklearn.svm import SVR
+from sklearn.svm import SVC
+
 from dtw import dtw
 
 def read_data(fileName):
@@ -77,70 +80,69 @@ if __name__ == "__main__":
         for i in range(cnt):
             ensembles = [hiromb[i], swan[i], noswan[i], add]
             predicted = ensemble_predict(ensembles, coeffs)
-            actual = meserments[i*6 + 1:]
+            actual = meserments[i*6:]
             rmses.append(DistMesurement(predicted, actual))
         rmseByEns.append(rmses)
     rmseByTime = zip(*rmseByEns)
  
-    learnCnt = 320 
  
     level = list()
     for pred in rmseByTime:
         best = min(pred)
         currentLevel = pred.index(best)
         level.append(currentLevel)
-
-    transition_count_matrix = [[1] * ensCount for i in range(ensCount)]
-    lastLvl = -1
-    for lvl in level[0:learnCnt]:
-        if lastLvl >= 0:
-            transition_count_matrix[lastLvl][lvl] += 1
-        lastLvl = currentLevel
-
-    transition_matrix = list()
-    for transitions in transition_count_matrix:
-        total = sum(transitions)
-        probability = [count/float(total) for count in transitions]
-        transition_matrix.append(probability)
-    
-    #meserments = preprocessing.normalize(meserments, norm='l2')
-            
+       
+    learnCnt = 320       
+       
     def get_x(i):
-        fst = i * 6 - 1
+        fst = i * 6 - 3
         end = i * 6
         msm = meserments[fst : end+1]     
         X = msm
         return X
        
-    lms = [linear_model.LinearRegression(normalize = True) for n in range(ensCount)]
-    Xs = [get_x(i) for i in range(1, learnCnt)]
-    Xs = preprocessing.scale(Xs)
+#    lms = [linear_model.LinearRegression(normalize = True) for n in range(ensCount)]
+    #lms = [SVR(kernel='rbf', C=1e3, gamma=0.3) for n in range(ensCount)]
+    Xs = [get_x(i) for i in range(1, cnt+1)]
+#    Xs = preprocessing.scale(Xs)
     
-    #Ys = preprocessing.normalize(rmseByEns)
-    for lm, rmses in zip(lms, rmseByEns):
-        lm.fit(Xs, rmses[1:learnCnt])
+    cl = SVC(kernel='rbf', C=1e3, gamma=0.3)    
     
-    def best_predict(Xs, lms, prev):
-        cfs = [1]*7#transition_matrix[prev] if prev >=0 else [1] * 7       
-        p_rmses = [( lm.predict(Xs) * cf )  for lm, cf in zip(lms, cfs)]
-        min_p_rmse = min(p_rmses)
-        return p_rmses.index(min_p_rmse)
+#    for lm, rmses in zip(lms, rmseByEns):
+#        lm.fit(Xs[1:learnCnt], rmses[1:learnCnt])
+    
+    cl.fit(Xs[1:learnCnt], level[1:learnCnt])    
+    
+#    def best_predict(X, lms):      
+#        p_rmses = [lm.predict(X) for lm in lms]
+#        min_p_rmse = min(p_rmses)
+#        return p_rmses.index(min_p_rmse)
+        
+    def best_predict(X):
+        return cl.predict(X)
 
     bestPred = list()
     worstPred = list() 
     mlPred = list()
     ensPred = rmseByEns[6][learnCnt:]
     
-    prevLevel = -1
+    better_count = 0
+    same_count = 0    
+    
     for i in range(learnCnt, cnt):
         X = get_x(i)
         
-        mlLvl = best_predict(X, lms, prevLevel)
+        mlLvl = best_predict(X)#, lms)
         bestLvl = level[i]
-        prevLevel = bestLvl
         
         bestPred.append(rmseByEns[bestLvl][i])
         mlPred.append(rmseByEns[mlLvl][i])
+        if mlPred[-1] < ensPred[i-learnCnt]:
+            better_count += 1
+        elif abs(mlPred[-1] - ensPred[i-learnCnt]) < 0.01:
+            same_count += 1
+            
+    print("Predict ensemble better than ""big"" {0} times, same {2} times from total {1}".format(better_count,cnt-learnCnt, same_count))
           
     plt.figure(figsize=(20,10))  
 #   # assert len(range(learnCnt, cnt)) == len(ensPred)

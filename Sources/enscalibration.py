@@ -62,7 +62,6 @@ def read_meserments(path, fileName):
     
 def get_msm_index(dt):
     tdelta = dt - MSM_BEGINING
-    #print(tdelta.total_seconds())
     return int(tdelta.total_seconds() / 3600)
     
 def read_predictions(path, model, point):  
@@ -83,7 +82,10 @@ def read_predictions(path, model, point):
                 pr = tokens[1:]
             dt = parser.parse(timestr, dayfirst=True, yearfirst=True)
             times.append(dt)
-            predictions[dt] = [float(l) for l in pr]
+            if model=="HIROMB":    
+                predictions[dt] = [float(l) - 37.356 for l in pr]
+            else:
+                predictions[dt] = [float(l) for l in pr]
             predictLen = len(tokens[2:])
     return predictions, times, predictLen
     
@@ -97,12 +99,14 @@ if __name__ == "__main__":
     GRN, S1 = read_meserments(path, \
         "GI_C1NB_C1FG_SHEP_restored_20130901000000_01.txt")
 
+    POINT = "GRN"
+    POINT_MSM = GRN
 
     modelsPredictions = list()
     modelTimes = list()
     predictLengths = list()
     for model in MODELS:
-        predictions, times, predictLen = read_predictions(path, model, "GRN")
+        predictions, times, predictLen = read_predictions(path, model, POINT)
         modelsPredictions.append(predictions)
         modelTimes.append(times)
         predictLengths.append(predictLen)
@@ -122,7 +126,7 @@ if __name__ == "__main__":
     target = list()
     for tm in times:
         msmIndex = get_msm_index(tm)
-        msm = GRN[msmIndex : msmIndex + minPredLen]
+        msm = POINT_MSM[msmIndex : msmIndex + minPredLen]
         target_len = len(msm)
         
         for currentPrediction, predictor \
@@ -167,7 +171,7 @@ if __name__ == "__main__":
         print(times[-1])
         print(get_msm_index(times[0]))
         print(get_msm_index(times[-1]))
-        msms = GRN[get_msm_index(times[0]):get_msm_index(times[-1])]
+        msms = POINT_MSM[get_msm_index(times[0]):get_msm_index(times[-1])+predictLen]
         msms_str = "\n".join([str(m) for m in msms])        
         aligned_mes_file.write(msms_str)
            # aligned_model_file.write("\n")
