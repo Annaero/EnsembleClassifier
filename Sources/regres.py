@@ -1,17 +1,10 @@
 # -*- coding: utf-8 -*-
 import sys
-from math import sqrt
 import os.path
 import matplotlib.pyplot as plt
-from sklearn import linear_model
-from sklearn import preprocessing
 import numpy as np
 from scipy.stats import norm
-
-from sklearn.svm import SVR
-from sklearn.svm import SVC
-
-from dtw import dtw
+from EnsembleClassifier import EnsembleClassifier
 
 def read_data(fileName):
     data = list()
@@ -23,7 +16,7 @@ def read_data(fileName):
             if len(levels) == 1:
                 levels = levels[0]
             else:
-                levels = levels[1:48] #TODO: Use full length
+                levels = levels[0:48]
             data.append(levels) 
             line = dataFile.readline()
     return data
@@ -35,115 +28,47 @@ def read_ens_coeffs(fileName):
             coefs = line.strip().split("\t")
             yield [float(e) for e in coefs]
             line = dataFile.readline()
-
-def ensemble_predict(ensembles, coeffs):
-    pred = [list(ens) for ens in zip(*ensembles)]
-    return [ sum([ p*c for p,c in zip(ens,coeffs)]) for ens in pred ]  
-
-def RMSE(predicted, actual):
-    rootErr = sum([ (p-a)**2 for p,a in zip(predicted, actual)]) / len(predicted)   
-    return sqrt(rootErr)
-    
-def DistMesurement(predicted, actual):
-    ln = min(len(predicted), len(actual))
-    dist, cost, path = dtw(predicted[:ln], actual[:ln])
-    return dist
-#    return RMSE(predicted, actual)
-
-#TODO: 
-        
+       
 if __name__ == "__main__":
     path = sys.argv[1]
     path2 = sys.argv[2]
 
-    measurementsFile = os.path.join(path, "2011080100_measurements_S1_2623.txt")
-    noswanFile = os.path.join(path, "2011080100_noswan_S1_48x434.txt")
-    swanFile = os.path.join(path, "2011080100_swan_S1_48x434.txt")
-    hirombFile = os.path.join(path, "2011080100_hiromb_S1_60x434.txt")
+    MODEL = "S1"
+
+    measurementsFile = os.path.join(path, "2011080100_measurements_{}_2623.txt".format(MODEL))
+    noswanFile = os.path.join(path, "2011080100_noswan_{}_48x434.txt".format(MODEL))
+    swanFile = os.path.join(path, "2011080100_swan_{}_48x434.txt".format(MODEL))
+    hirombFile = os.path.join(path, "2011080100_hiromb_{}_60x434.txt".format(MODEL))
     coeffsFile = os.path.join(path, "ens_coefs.txt")
     
-    meserments = read_data(measurementsFile)
+    measurements = read_data(measurementsFile)
     noswan = read_data(noswanFile)
     swan = read_data(swanFile)
     hiromb = read_data(hirombFile)
     
-    cnt = len(swan)
-    ensCount = 0
-    add = [1] * cnt
-    
-    plt.figure(figsize=(20,5))
-    
-    rmseByEns = list()
-    for coeffs in read_ens_coeffs(coeffsFile):
-        ensCount += 1
-        rmses = list()
-        for i in range(cnt):
-            ensembles = [hiromb[i], swan[i], noswan[i], add]
-            predicted = ensemble_predict(ensembles, coeffs)
-            actual = meserments[i*6:]
-            rmses.append(DistMesurement(predicted, actual))
-        rmseByEns.append(rmses)
-    rmseByTime = zip(*rmseByEns)
- 
- 
-    level = list()
-    for pred in rmseByTime:
-        best = min(pred)
-        currentLevel = pred.index(best)
-        level.append(currentLevel)
-       
-    learnCnt = 320       
-       
-    def get_x(i):
-        fst = i * 6 - 3
-        end = i * 6
-        msm = meserments[fst : end+1]     
-        X = msm
-        return X
-       
-#    lms = [linear_model.LinearRegression(normalize = True) for n in range(ensCount)]
-    #lms = [SVR(kernel='rbf', C=1e3, gamma=0.3) for n in range(ensCount)]
-    Xs = [get_x(i) for i in range(1, cnt+1)]
-#    Xs = preprocessing.scale(Xs)
-    
-    cl = SVC(kernel='rbf', C=1e3, gamma=0.3)    
-    
-#    for lm, rmses in zip(lms, rmseByEns):
-#        lm.fit(Xs[1:learnCnt], rmses[1:learnCnt])
-    
-    cl.fit(Xs[1:learnCnt], level[1:learnCnt])    
-    
-#    def best_predict(X, lms):      
-#        p_rmses = [lm.predict(X) for lm in lms]
-#        min_p_rmse = min(p_rmses)
-#        return p_rmses.index(min_p_rmse)
-        
-    def best_predict(X):
-        return cl.predict(X)
+    coefs = list(read_ens_coeffs(coeffsFile))
+    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements) 
+    classifier.prepare(3) 
 
-    bestPred = list()
-    worstPred = list() 
-    mlPred = list()
-    ensPred = rmseByEns[6][learnCnt:]
+    cnt = len(noswan)
+    learnCnt = 320
+     
+    classifier.train(range(1, learnCnt))
     
-    better_count = 0
-    same_count = 0    
+    bestPred = list()
+    mlPred = list()
+    ensPred = list()
     
     for i in range(learnCnt, cnt):
-        X = get_x(i)
-        
-        mlLvl = best_predict(X)#, lms)
-        bestLvl = level[i]
-        
-        bestPred.append(rmseByEns[bestLvl][i])
-        mlPred.append(rmseByEns[mlLvl][i])
-        if mlPred[-1] < ensPred[i-learnCnt]:
-            better_count += 1
-        elif abs(mlPred[-1] - ensPred[i-learnCnt]) < 0.01:
-            same_count += 1
+        _, mlErr = classifier.predict_best_ensemble(i)
+        _, bestErr = classifier.get_best_ensemble(i)
+        _, ensErr = classifier.get_biggest_ensemble(i)
+
+        bestPred.append(bestErr)
+        mlPred.append(mlErr)
+        ensPred.append(ensErr)
             
-    print("Predict ensemble better than ""big"" {0} times, same {2} times from total {1}".format(better_count,cnt-learnCnt, same_count))
-          
+         
     plt.figure(figsize=(20,10))  
 #   # assert len(range(learnCnt, cnt)) == len(ensPred)
 #    
@@ -157,7 +82,7 @@ if __name__ == "__main__":
     mlL, = plt.plot(range(learnCnt, cnt), mlPred, "c-", label = "classified {:.3}".format(mean))
     
     plt.legend(handles=[ensL, bestL, mlL])
-    plt.savefig(os.path.join(path2, "S1_fig3_DTW_100_by4.png"))
+    plt.savefig(os.path.join(path2, "{}_fig3_DTW_SVR_by4.png".format(MODEL)))
     plt.show()
     plt.close()
     
@@ -170,16 +95,16 @@ if __name__ == "__main__":
     plt.hist(bestPred, bins, color='green' ,normed=1, alpha=0.4, histtype='bar', label="best")
     plt.hist(mlPred, bins, color='red', normed=1, alpha=1, histtype='step', label="ml")
     
-    plt.savefig(os.path.join(path2, "S1_fig4_DTW_100_by4.png"))
+    plt.savefig(os.path.join(path2, "{}_fig4_DTW_SVR_by4.png".format(MODEL)))
     plt.show()
     plt.close()
     
     plt.figure(figsize=(15,10))
-    x = np.linspace(0, 35, binsc)
+    x = np.linspace(0, 10, binsc)
 
     params = norm.fit(ensPred)
     pdf_f = norm.pdf(x, loc=params[0],scale=params[1])
-    ensL, = plt.plot(x, pdf_f, color='blue', label="ensemble 7")
+    ensL, = plt.plot(x, pdf_f, color='blue', label="ensemble")
     
     params = norm.fit(bestPred)
     pdf_f = norm.pdf(x, loc=params[0],scale=params[1])
@@ -190,7 +115,7 @@ if __name__ == "__main__":
     mlL, =  plt.plot(x, pdf_f, color='red', label="predicted")
 
     plt.legend(handles=[ensL, bestL, mlL])
-    plt.savefig(os.path.join(path2, "S1_fig5_DTW_100_by4.png"))
+    plt.savefig(os.path.join(path2, "{}_fig5_DTW_SVR_by4.png".format(MODEL)))
 
     plt.show()
     plt.close()
