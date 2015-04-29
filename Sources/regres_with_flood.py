@@ -103,10 +103,11 @@ if __name__ == "__main__":
 #    plt.show() 
 #    
 
-    learnCnt = 220
+    learnCnt = 200
+    validateStart = 220
     
     def get_x(i):
-        fst = i * 6 - 3
+        fst = i * 6 - 4
         end = i * 6
         msm = measurements[fst : end + 1]     
         return msm
@@ -134,9 +135,9 @@ if __name__ == "__main__":
     bestPred = list()
     worstPred = list() 
     mlPred = list()
-    ensPred = rmseByEns[0][learnCnt:]
+    ensPred = rmseByEns[0][validateStart:]
     
-    for i in range(learnCnt, cnt):
+    for i in range(validateStart, cnt):
         X = get_x(i)
         
 #        mlLvl = best_predict(X)
@@ -147,14 +148,14 @@ if __name__ == "__main__":
         mlPred.append(rmseByEns[mlLvl][i])
           
     plt.figure(figsize=(10,5))  
-    mean = sum(ensPred) / (cnt-learnCnt)
-    ensL, = plt.plot(range(learnCnt, cnt), ensPred, "r",label = "ensamble {:.3}".format(mean))
+    mean = sum(ensPred) / (cnt-validateStart)
+    ensL, = plt.plot(range(validateStart, cnt), ensPred, "r",label = "ensamble {:.3}".format(mean))
     
-    mean = sum(bestPred) / (cnt-learnCnt)
-    bestL, = plt.plot(range(learnCnt, cnt), bestPred, "*", label = "best {:.2}".format(mean))
+    mean = sum(bestPred) / (cnt-validateStart)
+    bestL, = plt.plot(range(validateStart, cnt), bestPred, "*", label = "best {:.2}".format(mean))
     
-    mean = sum(mlPred) / (cnt-learnCnt)
-    mlL, = plt.plot(range(learnCnt, cnt), mlPred, "c-", label = "classified {:.3}".format(mean))
+    mean = sum(mlPred) / (cnt-validateStart)
+    mlL, = plt.plot(range(validateStart, cnt), mlPred, "c-", label = "classified {:.3}".format(mean))
     
     plt.legend(handles=[ensL, bestL, mlL])
     plt.savefig(os.path.join(artifacts_path, "new_ens_pred_err.png"))
