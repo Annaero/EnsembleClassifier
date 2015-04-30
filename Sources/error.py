@@ -7,57 +7,13 @@ Created on Mon Apr 27 17:24:02 2015
 
 # -*- coding: utf-8 -*-
 import sys
-from math import sqrt
 import os.path
 import matplotlib.pyplot as plt
-from sklearn import linear_model
-from sklearn import preprocessing
-import numpy as np
-from scipy.stats import norm
 
-from sklearn.svm import SVR
-from sklearn.svm import SVC
+from EnsembleClassifier import EnsembleClassifier
+from regres import read_data, read_ens_coeffs 
+from sklearn.cross_validation import ShuffleSplit
 
-from dtw import dtw
-
-def read_data(fileName):
-    data = list()
-    with open(fileName, "r") as dataFile:
-        line = dataFile.readline()
-        while line:
-            levels = line.strip().split("\t")
-            levels =  [float(lvl) for lvl in levels]
-            if len(levels) == 1:
-                levels = levels[0]
-            else:
-                levels = levels[0:48] #TODO: Use full length
-            data.append(levels) 
-            line = dataFile.readline()
-    return data
-    
-def read_ens_coeffs(fileName):
-    with open(fileName, "r") as dataFile:
-        line = dataFile.readline()
-        while line:
-            coefs = line.strip().split("\t")
-            yield [float(e) for e in coefs]
-            line = dataFile.readline()
-
-def ensemble_predict(ensembles, coeffs):
-    pred = [list(ens) for ens in zip(*ensembles)]
-    return [ sum([ p*c for p,c in zip(ens,coeffs)]) for ens in pred ]  
-
-def RMSE(predicted, actual):
-    rootErr = sum([ (p-a)**2 for p,a in zip(predicted, actual)]) / len(predicted)   
-    return sqrt(rootErr)
-    
-def DistMesurement(predicted, actual):
-    ln = min(len(predicted), len(actual))
-    dist, cost, path = dtw(predicted[:ln], actual[:ln])
-    return dist
-#    return RMSE(predicted, actual)
-
-#TODO: 
         
 if __name__ == "__main__":
     path = sys.argv[1]
@@ -71,102 +27,76 @@ if __name__ == "__main__":
     hirombFile = os.path.join(path, "2011080100_hiromb_{}_60x434.txt".format(MODEL))
     coeffsFile = os.path.join(path, "ens_coefs.txt")
     
-    meserments = read_data(measurementsFile)
+    measurements = read_data(measurementsFile)
     noswan = read_data(noswanFile)
     swan = read_data(swanFile)
     hiromb = read_data(hirombFile)
     
-    cnt = len(swan)
-    ensCount = 0
-    add = [1] * cnt
-    
-    plt.figure(figsize=(20,5))
-    
-    rmseByEns = list()
-    for coeffs in read_ens_coeffs(coeffsFile):
-        ensCount += 1
-        rmses = list()
-        for i in range(cnt):
-            ensembles = [hiromb[i], swan[i], noswan[i], add]
-            predicted = ensemble_predict(ensembles, coeffs)
-            actual = meserments[i*6:]
-            rmses.append(DistMesurement(predicted, actual))
-        rmseByEns.append(rmses)
-    rmseByTime = zip(*rmseByEns)
- 
- 
-    level = list()
-    for pred in rmseByTime:
-        best = min(pred)
-        currentLevel = pred.index(best)
-        level.append(currentLevel)
-      
-    maxLearnCnt  = 320
-    validationStart = maxLearnCnt
-    
-    plt.figure(figsize=(20,10))  
-    plt.xticks(range(0, maxLearnCnt, 10))  
-    
-    hd = []
-    
-    for dd in range(0, 3):
-        def get_x(i):
-            fst = i * 6 - dd
-            end = i * 6
-            msm = meserments[fst : end+1]     
-            X = msm
-            return X    
-        
-        means = []
-        ensMeans = []
-        for learnCnt in range(2, maxLearnCnt):    
-        #    lms = [linear_model.LinearRegression(normalize = True) for n in range(ensCount)]
-            lms = [SVR(kernel='rbf', C=1e3, gamma=0.3) for n in range(ensCount)]
-            Xs = [get_x(i) for i in range(1, cnt+1)]
-        #    Xs = preprocessing.scale(Xs)
-            
-#            cl = SVC(kernel='rbf', C=1e3, gamma=0.3)    
-            
-            for lm, rmses in zip(lms, rmseByEns):
-                lm.fit(Xs[1:learnCnt], rmses[1:learnCnt])
-            
-        #    cl.fit(Xs[1:learnCnt], level[1:learnCnt])    
-            
-            def best_predict(X, lms):      
-                p_rmses = [lm.predict(X) for lm in lms]
-                min_p_rmse = min(p_rmses)
-                return p_rmses.index(min_p_rmse)
-                
-        #    def best_predict(X):
-        #        return cl.predict(X)
-        
-            bestPred = list()
-            worstPred = list() 
-            mlPred = list()
-    
-            better_count = 0
-            same_count = 0
-            
-            for i in range(validationStart, cnt):
-                X = get_x(i)
-                
-                mlLvl = best_predict(X, lms)
-                bestLvl = level[i]
-                
-                bestPred.append(rmseByEns[bestLvl][i])
-                mlPred.append(rmseByEns[mlLvl][i])
-    
-               
-            ensMeans.append(sum(rmseByEns[6][validationStart:cnt]) / (cnt-validationStart))
-            mean = sum(mlPred) / (cnt-validationStart)
-            means.append(mean)
-                
+    from EnsembleClassifier import EnsembleClassifier
+    coefs = list(read_ens_coeffs(coeffsFile))
+    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier.prepare(3) 
 
-        mlL, = plt.plot(range(2, maxLearnCnt), means, label = "{} points".format(dd+1))
-        hd.append(mlL)
+    total = len(hiromb)
+    max_learn_count = 280
+    validate_count = total - max_learn_count
+    variants = 20
+
+    ml_errors = []
+    ens_errors = []
+    best_errors = []
+    for learn_count in range(2, max_learn_count):
+        print("Learn count {}".format(learn_count))
+        ml_avg_list = []
+        ens_avg_list = []
+        best_avg_list = []
         
-    plt.plot(range(2, maxLearnCnt), ensMeans, "r-")
-    plt.legend(handles=hd)
+        shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
+        for (train_set, validate_set) in shuffle:
+            ts = list(train_set)
+            vs = list(validate_set)
+            
+            classifier.train(ts)
+            
+            ml = [classifier.predict_best_ensemble(i)[1] for i in vs]
+            ml_avg = sum(ml) / len(vs)
+            ml_avg_list.append(ml_avg)
+            
+            ens = [classifier.get_biggest_ensemble(i)[1] for i in vs]
+            ens_avg = sum(ens) / len(vs)
+            ens_avg_list.append(ens_avg)
+            
+            best = [classifier.get_best_ensemble(i)[1] for i in vs]
+            best_avg = sum(best) / len(vs)
+            best_avg_list.append(best_avg)
+            
+        ml_errors.append((sum(ml_avg_list)/len(ml_avg_list), min(ml_avg_list), max(ml_avg_list)))
+        ens_errors.append((sum(ens_avg_list)/len(ens_avg_list), min(ens_avg_list), max(ens_avg_list)))
+        best_errors.append((sum(best_avg_list)/len(best_avg_list), min(best_avg_list), max(best_avg_list)))
+    
+    plt.figure(figsize=(15,10))
+    for errors in [ml_errors, ens_errors, best_errors]:
+        mlErrors = list(zip(*errors))
+        err = mlErrors[0]
+#        for i in range(0, len(mlErrors[0])):
+#            me = sum(mlErrors[0][i:i+5])/len(mlErrors[0][i:i+5])
+#            err.append(me)
+        
+        asym = [mlErrors[1], mlErrors[2]]
+        
+        
+        plt.plot(range(2, max_learn_count), err)
     plt.show()
     plt.close()
+        
+#    plt.errorbar(range(2, max_learn_count), err, asym)
+      
+#    bestPred = list()
+#    mlPred = list()
+#    ensPred = list()              
+#        
+#    plt.plot(range(2, maxLearnCnt), ensMeans, "r-")
+#    plt.legend(handles=hd)
+#    plt.show()
+#    plt.close()
     

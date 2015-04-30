@@ -21,7 +21,6 @@ def dist_mesurement(predicted, actual):
 def ensemble_predictions(models, coeffs):
     predictions = list()
     for models_prediction in zip(*models):
-#        print(models_prediction)
         predictions_by_time = [list(ens) for ens in zip(*models_prediction)]
         ensemble_predection = [sum([ p*c for p,c in zip(ens, coeffs)]) \
                                     for ens in predictions_by_time]
@@ -52,7 +51,7 @@ class EnsembleClassifier(object):
         
         def get_x(i):
             if i > 0:
-                fst = i * 6 - p_count - 1
+                fst = i * 6 - p_count + 1
                 end = i * 6
                 msm = self._measurements[fst : end + 1]
             else:
@@ -76,13 +75,13 @@ class EnsembleClassifier(object):
             currentLevel = predictions.index(best)
             self._best_ensemble_by_time.append(currentLevel)
         
-    def train(self, train_set):      
+    def train(self, training_set):  
         self._prediction_models = \
             [SVR(kernel='rbf', C=1e3, gamma=0.3) for n in range( self._ens_count)]
            
-        predictors = get_elements(self._x_by_time, train_set)
+        predictors = get_elements(self._x_by_time, training_set)
         for pm, errors in zip(self._prediction_models, self._errors_by_ens):
-            predicate = get_elements(errors, train_set)
+            predicate = get_elements(errors, training_set)         
             pm.fit(predictors, predicate)
         
     def predict_best_ensemble(self, t):

@@ -47,11 +47,11 @@ if __name__ == "__main__":
     hiromb = read_data(hirombFile)
     
     coefs = list(read_ens_coeffs(coeffsFile))
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements) 
+    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
     classifier.prepare(3) 
 
     cnt = len(noswan)
-    learnCnt = 320
+    learnCnt = 280
      
     classifier.train(range(1, learnCnt))
     
@@ -67,8 +67,7 @@ if __name__ == "__main__":
         bestPred.append(bestErr)
         mlPred.append(mlErr)
         ensPred.append(ensErr)
-            
-         
+                     
     plt.figure(figsize=(20,10))  
 #   # assert len(range(learnCnt, cnt)) == len(ensPred)
 #    

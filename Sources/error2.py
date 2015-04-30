@@ -4,14 +4,8 @@ import sys
 import os
 import os.path
 import matplotlib.pyplot as plt
-from sklearn.svm import SVR, SVC
-from sklearn import preprocessing
 
-from sklearn import linear_model
-
-from dateutil.rrule import rrule, HOURLY
-from enscalibration import read_meserments, read_predictions, get_msm_index, MODELS
-from regres import read_ens_coeffs, DistMesurement, ensemble_predict
+from sklearn.cross_validation import ShuffleSplit
 
 def read_data(fileName):
     data = list()
@@ -40,110 +34,63 @@ if __name__ == "__main__":
         prediction = read_data(m_file)
         predictions.append(prediction)
     
+    coeffsFile = os.path.join(path, "ens_coef.txt")
+    
     measurements = read_data(os.path.join(path, "mesur"))
     
-    cnt = len(predictions[0])
-    pred_len = len(predictions[0][0])
-    
-    
-#    rmseByMod = list()  
-#    for prediction in predictions:
-#        errorsByTime = []        
-#        for tm in range(cnt-1):
-#            pred = prediction[tm]
-#            actual = measurements[tm*6+1:]
-#            error = DistMesurement(pred, actual)
-#            errorsByTime.append(error)
-#        rmseByMod.append(errorsByTime)
-#        
-#    plt.figure(figsize=(20,5))
-##
-# 
-#    handles = []
-#    for errors, model in zip(rmseByMod, MODELS):
-#        lbl, = plt.plot(range(cnt-1), errors, label = model)
-#        handles.append(lbl)
-#    plt.legend(handles=handles)
-#    plt.savefig("error_model.tmp.png")
-#        
-#    plt.show()  
-      
-    rmseByEns = list()
-    ens_coeff = list(read_ens_coeffs(os.path.join(path, "ens_coef.txt")))[:-1]
-    ensCount = len(ens_coeff)
-    for coeffs in ens_coeff:
-        rmses = list()    
-        for i in range(cnt):
-            pred = list([p[i] for p in predictions])
-            pred.append([1]*pred_len)
-            predicted = ensemble_predict(pred, coeffs)
-            actual = measurements[i*6:]
-            rmses.append(DistMesurement(predicted, actual))
-        rmseByEns.append(rmses)
-    rmseByTime = zip(*rmseByEns)
-    
-#    plt.figure(figsize=(20,5))
-#    patches = []
-#    for errors, coeff in zip(rmseByEns, ens_coeff):
-#        patch, = plt.plot(range(cnt-1), errors, label=str(coeff))
-#        patches.append(patch)
-#    plt.legend(handles=patches)  
-#    plt.savefig(os.path.join(os.path.join(artifacts_path, "new_ens_errors.png")))
-#    plt.show()
-    
-    level = list()
-    for pred in rmseByTime:
-        best = min(pred)
-        currentLevel = pred.index(best)
-        level.append(currentLevel)
-    
-#    plt.figure(figsize=(20,5))
-#    for errors in rmseByEns:
-#        plt.plot(range(cnt-1), level)
-#    plt.show() 
-#    
+    from EnsembleClassifier import EnsembleClassifier
+    coefs = list(read_ens_coeffs(coeffsFile))
+    classifier = EnsembleClassifier(predictions, coefs, measurements)
+    classifier.prepare(3) 
 
-    def get_x(i):
-            fst = i * 6 - 4
-            end = i * 6
-            msm = measurements[fst : end + 1]     
-            return msm
+    total = len(predictions[0])
+    max_learn_count = 200
+    validate_count = total - max_learn_count
+    variants = 20
 
-    maxLearnCnt  = 80 
-    means = []
-    ensMeans = []
-    for learnCnt in range(2, maxLearnCnt):
-    #    lms = [linear_model.LinearRegression(normalize = True) for n in range(ensCount)]
-        lms = [SVR(kernel='rbf', C=1e3, gamma=0.3) for n in range(ensCount)]
-    #    lms = [SVR(kernel='poly', C=1e3, degree=2) for n in range(ensCount)]
-        Xs = [get_x(i) for i in range(cnt)]
+    ml_errors = []
+    ens_errors = []
+    best_errors = []
+    for learn_count in range(2, max_learn_count):
+        print("Learn count {}".format(learn_count))
+        ml_avg_list = []
+        ens_avg_list = []
+        best_avg_list = []
         
-        for lm, rmses in zip(lms, rmseByEns):
-            lm.fit(Xs[1:learnCnt], rmses[1:learnCnt])    
+        shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
+        for (train_set, validate_set) in shuffle:
+            ts = list(train_set)
+            vs = list(validate_set)
+            
+            classifier.train(ts)
+            
+            ml = [classifier.predict_best_ensemble(i)[1] for i in vs]
+            ml_avg = sum(ml) / len(vs)
+            ml_avg_list.append(ml_avg)
+            
+            ens = [classifier.get_biggest_ensemble(i)[1] for i in vs]
+            ens_avg = sum(ens) / len(vs)
+            ens_avg_list.append(ens_avg)
+            
+            best = [classifier.get_best_ensemble(i)[1] for i in vs]
+            best_avg = sum(best) / len(vs)
+            best_avg_list.append(best_avg)
+            
+        ml_errors.append((sum(ml_avg_list)/len(ml_avg_list), min(ml_avg_list), max(ml_avg_list)))
+        ens_errors.append((sum(ens_avg_list)/len(ens_avg_list), min(ens_avg_list), max(ens_avg_list)))
+        best_errors.append((sum(best_avg_list)/len(best_avg_list), min(best_avg_list), max(best_avg_list)))
+    
+    plt.figure(figsize=(15,10))
+    for errors in [ml_errors, ens_errors, best_errors]:
+        mlErrors = list(zip(*errors))
+        err = mlErrors[0]
+#        for i in range(0, len(mlErrors[0])):
+#            me = sum(mlErrors[0][i:i+5])/len(mlErrors[0][i:i+5])
+#            err.append(me)
         
-        def best_predict(X, lms1):
-            p_rmses = [lm.predict(X) for lm in lms1]
-            min_p_rmse = min(p_rmses)
-            return p_rmses.index(min_p_rmse)
-            
-        bestPred = list()
-        mlPred = list()
+        asym = [mlErrors[1], mlErrors[2]]
         
-        for i in range(maxLearnCnt, cnt):
-            X = get_x(i)
-            
-            mlLvl = best_predict(X, lms)
-            bestLvl = level[i]
-            
-            bestPred.append(rmseByEns[bestLvl][i])
-            mlPred.append(rmseByEns[mlLvl][i])
-          
-        ensMeans.append(sum(rmseByEns[0][maxLearnCnt:cnt]) / (cnt-maxLearnCnt))
-        mean = sum(mlPred) / (cnt-maxLearnCnt)
-        means.append(mean)
-                 
-    plt.figure(figsize=(20,10))  
-    plt.plot(range(2, maxLearnCnt), ensMeans, "r-")
-    mlL, = plt.plot(range(2, maxLearnCnt), means, "b-")
+        
+        plt.plot(range(2, max_learn_count), err)
     plt.show()
     plt.close()
