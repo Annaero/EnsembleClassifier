@@ -4,6 +4,9 @@ import sys
 import os
 import os.path
 import matplotlib.pyplot as plt
+from enscalibration import MODELS
+from regres import read_ens_coeffs
+from EnsembleClassifier import EnsembleClassifier 
 
 from sklearn.cross_validation import ShuffleSplit
 
@@ -22,8 +25,6 @@ def read_data(fileName):
             line = dataFile.readline()
     return data
 
-#MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m"]#, "HIROMB"]
-
 if __name__ == "__main__":
     path = sys.argv[1]
     artifacts_path = sys.argv[2]
@@ -34,25 +35,27 @@ if __name__ == "__main__":
         prediction = read_data(m_file)
         predictions.append(prediction)
     
-    coeffsFile = os.path.join(path, "ens_coef.txt")
+    coeffsFile = os.path.join("../Data/", "ens_coefs.txt")
+#    coeffsFile = os.path.join(path, "ens_coef.txt")
     
     measurements = read_data(os.path.join(path, "mesur"))
     
-    from EnsembleClassifier import EnsembleClassifier
     coefs = list(read_ens_coeffs(coeffsFile))
+    coefs.reverse()
+    
     classifier = EnsembleClassifier(predictions, coefs, measurements)
     classifier.prepare(3) 
 
     total = len(predictions[0])
-    max_learn_count = 200
+    max_learn_count = 100
     validate_count = total - max_learn_count
     variants = 20
 
     ml_errors = []
     ens_errors = []
     best_errors = []
-    for learn_count in range(2, max_learn_count):
-        print("Learn count {}".format(learn_count))
+    for learn_count in range(1, max_learn_count):
+#        print("Learn count {}".format(learn_count))
         ml_avg_list = []
         ens_avg_list = []
         best_avg_list = []
@@ -91,6 +94,6 @@ if __name__ == "__main__":
         asym = [mlErrors[1], mlErrors[2]]
         
         
-        plt.plot(range(2, max_learn_count), err)
+        plt.plot(range(1, max_learn_count), err)
     plt.show()
     plt.close()
