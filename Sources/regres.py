@@ -102,7 +102,7 @@ if __name__ == "__main__":
     x = np.linspace(0, 10, binsc)
 
     params = norm.fit(ensPred)
-    pdf_f = norm.pdf(x, loc=params[0],scale=params[1])
+    pdf_f = norm.pdf(x, loc=params[0], scale=params[1])
     ensL, = plt.plot(x, pdf_f, color='blue', label="ensemble")
     
     params = norm.fit(bestPred)

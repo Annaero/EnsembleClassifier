@@ -46,13 +46,13 @@ class EnsembleClassifier(object):
 
         self._make_ensembles_predictions(models, coefs)
             
-    def prepare(self, p_count = 1, distance_measure = dist_mesurement):
+    def prepare(self, p_count = 1, distance_measure = dist_mesurement, zero_point_shift = 0):
         """Make some precalculations"""
         
         def get_x(i):
             if i > 0:
-                fst = i * 6 - p_count + 1
-                end = i * 6
+                fst = i * 6 - p_count + 1 + zero_point_shift
+                end = i * 6 + zero_point_shift
                 msm = self._measurements[fst : end + 1]
             else:
                 msm = [0]*(p_count-1) + [self._measurements[0]]

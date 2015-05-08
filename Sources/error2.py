@@ -35,8 +35,8 @@ if __name__ == "__main__":
         prediction = read_data(m_file)
         predictions.append(prediction)
     
-    coeffsFile = os.path.join("../Data/", "ens_coefs.txt")
-#    coeffsFile = os.path.join(path, "ens_coef.txt")
+#    coeffsFile = os.path.join("../Data/", "ens_coefs.txt")
+    coeffsFile = os.path.join(path, "ens_coef.txt")
     
     measurements = read_data(os.path.join(path, "mesur"))
     
