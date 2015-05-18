@@ -10,7 +10,7 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
-from EnsembleClassifier import EnsembleClassifier
+from EnsembleClassifier import EnsembleClassifier, get_elements
 from dtw import dtw
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
@@ -44,7 +44,7 @@ def dist_mesurement(ts1, ts2):
     dist, cost, path = dtw(ts1[:ln], ts2[:ln])
     return dist  
 #    return mean_squared_error(ts1, ts2)  
-    return mean_absolute_error(ts1, ts2)
+#    return mean_absolute_error(ts1, ts2)
        
 if __name__ == "__main__":
     path = sys.argv[1]
@@ -62,9 +62,12 @@ if __name__ == "__main__":
     noswan = read_data(noswanFile)
     swan = read_data(swanFile)
     hiromb = [[p - 37.356 for p in predictions] for predictions in read_data(hirombFile)]
+    hiromb1 = read_data(hirombFile)
     
     coefs = list(read_ens_coeffs(coeffsFile))
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier = EnsembleClassifier([hiromb1, swan, noswan], coefs, measurements)
+#    classifier = EnsembleClassifier([hiromb, swan, noswan], [[1,0,0], [0,1,0], [0,0,1]], measurements)
+    classifier.prepare(5)
     
 #    ensembles = classifier._ensembles
     ensembles = [noswan, swan, hiromb]
@@ -73,17 +76,33 @@ if __name__ == "__main__":
         pairs = zip(ensembles[e1], ensembles[e2])
         disanses[(e1,e2)] = [dist_mesurement(ts1, ts2) for ts1, ts2 in pairs]
     
-#    plt.figure(figsize=[70, 70]) 
-    plt.figure(figsize=[10, 10])
-    plt.title("MAE")
+#    plt.figure(figsize=[100, 100]) 
+    plt.figure(figsize=[16, 16])
+#    plt.title("MAE")
     i=1
+    models=["hiromb", "swan", "noswan"]
     for (dist1, dist2) in combinations(disanses.keys(), 2):
 #        plt.subplot(21,10,i)
-        plt.subplot(3,1,i)
-        plt.plot(disanses[dist1], disanses[dist2], "*")
+        plt.subplot(2,2,i)
         
-        plt.xlabel(str(dist1))
-        plt.ylabel(str(dist2))
+        enss = [[list(), list()] for e in coefs]
+        for t in range(len(hiromb)):
+            e = classifier._best_ensemble_by_time[t]
+            enss[e][0].append(disanses[dist1][t])
+            enss[e][1].append(disanses[dist2][t])
+        
+        lines = []
+        for e, c in zip(enss, range(len(coefs))):
+            if(len(e[0]) > 40):
+                label = ", ".join([models[m] for m in range(len(models)) if coefs[c][m]])
+                line, = plt.plot(e[0], e[1], "o", markersize=5, label=label)
+                lines.append(line)
+        
+        plt.legend(handles=lines)
+        plt.xlim(0,8)
+        plt.ylim(0,8)
+        plt.xlabel(", ".join([models[dist1[0]], models[dist1[1]]]), fontsize=12)
+        plt.ylabel(", ".join([models[dist2[0]], models[dist2[1]]]), fontsize=12)
         i+=1
     plt.show()
     plt.close()

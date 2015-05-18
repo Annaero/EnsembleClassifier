@@ -13,8 +13,10 @@ import matplotlib.pyplot as plt
 from EnsembleClassifier import EnsembleClassifier
 from regres import read_data, read_ens_coeffs 
 from sklearn.cross_validation import ShuffleSplit
+from statistics import mean, median
+from SelectionStrategy import NoneStrategy
 
-        
+     
 if __name__ == "__main__":
     path = sys.argv[1]
 #    path2 = sys.argv[2]
@@ -32,71 +34,61 @@ if __name__ == "__main__":
     swan = read_data(swanFile)
     hiromb = read_data(hirombFile)
     
-    from EnsembleClassifier import EnsembleClassifier
     coefs = list(read_ens_coeffs(coeffsFile))
     classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier.prepare(3) 
-
+    
+    classifier.prepare(1) 
+    strategy = NoneStrategy(classifier)
+    
     total = len(hiromb)
-    max_learn_count = 280
+    max_learn_count = 200
     validate_count = total - max_learn_count
     variants = 20
 
     ml_errors = []
     ens_errors = []
     best_errors = []
-    for learn_count in range(2, max_learn_count):
-        print("Learn count {}".format(learn_count))
-        ml_avg_list = []
-        ens_avg_list = []
-        best_avg_list = []
+    for learn_count in range(1, max_learn_count):
+        ml_list = []
+        ens_list = []
+        best_list = []
         
         shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
-        for (train_set, validate_set) in shuffle:
-            ts = list(train_set)
-            vs = list(validate_set)
+        for (training_set, validate_set) in shuffle:
+            strategy.retrain_classifier(training_set)
+            errors = [strategy.get_next_ensemble(i) for i in validate_set]
+
+            errors_by_time = list(zip(*errors))
+            [bestErr, ensErr, mlErr, _] = errors_by_time
+            ml_list+=list(mlErr)
+            ens_list+=list(ensErr)
+            best_list+=list(bestErr)
             
-            classifier.train(ts)
-            
-            ml = [classifier.predict_best_ensemble(i)[1] for i in vs]
-            ml_avg = sum(ml) / len(vs)
-            ml_avg_list.append(ml_avg)
-            
-            ens = [classifier.get_biggest_ensemble(i)[1] for i in vs]
-            ens_avg = sum(ens) / len(vs)
-            ens_avg_list.append(ens_avg)
-            
-            best = [classifier.get_best_ensemble(i)[1] for i in vs]
-            best_avg = sum(best) / len(vs)
-            best_avg_list.append(best_avg)
-            
-        ml_errors.append((sum(ml_avg_list)/len(ml_avg_list), min(ml_avg_list), max(ml_avg_list)))
-        ens_errors.append((sum(ens_avg_list)/len(ens_avg_list), min(ens_avg_list), max(ens_avg_list)))
-        best_errors.append((sum(best_avg_list)/len(best_avg_list), min(best_avg_list), max(best_avg_list)))
-    
-    plt.figure(figsize=(15,10))
-    for errors in [ml_errors, ens_errors, best_errors]:
-        mlErrors = list(zip(*errors))
-        err = mlErrors[0]
-#        for i in range(0, len(mlErrors[0])):
-#            me = sum(mlErrors[0][i:i+5])/len(mlErrors[0][i:i+5])
-#            err.append(me)
+        ml_errors.append(mean(ml_list))
+        ens_errors.append(mean(ens_list))
+        best_errors.append(mean(best_list))
         
-        asym = [mlErrors[1], mlErrors[2]]
+    plt.figure(figsize=(10, 10))
+
+    plt.title("Validation set size={}".format(validate_count), fontsize = 15)
+
+    ml_line, = plt.plot(range(max_learn_count-1), ml_errors, label="Predicted") 
+    ens_line, = plt.plot(range(max_learn_count-1), ens_errors, label="Ensemble")
+    best_lb, = plt.plot(range(max_learn_count-1), best_errors, label="Best")
         
-        
-        plt.plot(range(2, max_learn_count), err)
+    plt.legend(handles=[ml_line, ens_line, best_lb], fontsize = 12)
+
+    plt.ylabel("Mean error", fontsize = 12)
+    plt.xlabel("Training set size", fontsize = 12)
+
     plt.show()
     plt.close()
-        
-#    plt.errorbar(range(2, max_learn_count), err, asym)
-      
-#    bestPred = list()
-#    mlPred = list()
-#    ensPred = list()              
-#        
-#    plt.plot(range(2, maxLearnCnt), ensMeans, "r-")
-#    plt.legend(handles=hd)
-#    plt.show()
-#    plt.close()
     
+#        errors_by_points.append(ml_errors[0])
+    
+#    plt.figure(figsize=[7,7])    
+#    plt.title("Mean error by history length", fontsize=15)
+#    plt.plot(range(1,len(errors_by_points)+1), errors_by_points)
+#    plt.xlabel("Points", fontsize=12)
+#    plt.ylabel("Mean error", fontsize=12)    
+#    plt.show()
