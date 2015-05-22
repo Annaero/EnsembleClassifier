@@ -10,6 +10,7 @@ import sys
 import os.path
 import matplotlib.pyplot as plt
 
+from sklearn.svm import SVR
 from EnsembleClassifier import EnsembleClassifier
 from regres import read_data, read_ens_coeffs 
 from sklearn.cross_validation import ShuffleSplit
@@ -36,59 +37,101 @@ if __name__ == "__main__":
     
     coefs = list(read_ens_coeffs(coeffsFile))
     classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier2 = classifier.copy()
     
-    classifier.prepare(1) 
-    strategy = NoneStrategy(classifier)
+    total = len(hiromb)    
     
-    total = len(hiromb)
-    max_learn_count = 200
-    validate_count = total - max_learn_count
-    variants = 20
-
-    ml_errors = []
-    ens_errors = []
-    best_errors = []
-    for learn_count in range(1, max_learn_count):
-        ml_list = []
-        ens_list = []
-        best_list = []
+    svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)    
         
-        shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
-        for (training_set, validate_set) in shuffle:
-            strategy.retrain_classifier(training_set)
-            errors = [strategy.get_next_ensemble(i) for i in validate_set]
-
-            errors_by_time = list(zip(*errors))
-            [bestErr, ensErr, mlErr, _] = errors_by_time
-            ml_list+=list(mlErr)
-            ens_list+=list(ensErr)
-            best_list+=list(bestErr)
-            
-        ml_errors.append(mean(ml_list))
-        ens_errors.append(mean(ens_list))
-        best_errors.append(mean(best_list))
+#        learn_count = 30
+    errors_by_ts = []
+    ts_sizes = [30, 70, 120, 145]
+    for learn_count in ts_sizes:
+        validate_count = total - 150
+        variants = 20    
         
-    plt.figure(figsize=(10, 10))
-
-    plt.title("Validation set size={}".format(validate_count), fontsize = 15)
-
-    ml_line, = plt.plot(range(max_learn_count-1), ml_errors, label="Predicted") 
-    ens_line, = plt.plot(range(max_learn_count-1), ens_errors, label="Ensemble")
-    best_lb, = plt.plot(range(max_learn_count-1), best_errors, label="Best")
+        errors_by_points_linear = []
+        errors_by_points_svr = []
+        max_points = 15
+        for points in range(1, max_points):
+            classifier.prepare(points) 
+            classifier2.prepare(points)
+    
+            linear = []
+            svr = []
+                
+            shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
+            for (training_set, validate_set) in shuffle:
+                classifier.train(training_set)
+                classifier2.train(training_set, regression_model=svm_model)
+                
+                linear += [classifier.predict_best_ensemble(i)[1] for i in validate_set] 
+                svr += [classifier2.predict_best_ensemble(i)[1] for i in validate_set]
+                
+            errors_by_points_linear.append(mean(linear))  
+            errors_by_points_svr.append(mean(svr))
+        errors_by_ts.append((errors_by_points_linear, errors_by_points_svr))
         
-    plt.legend(handles=[ml_line, ens_line, best_lb], fontsize = 12)
-
-    plt.ylabel("Mean error", fontsize = 12)
-    plt.xlabel("Training set size", fontsize = 12)
-
+        
+    plt.figure(figsize=[10,10])
+    plt.suptitle("Mean error by history length\nvalidation set size={0}".format(validate_count),
+                        fontsize = 15)
+    for (errors_by_points_linear, errors_by_points_svr), i in zip(errors_by_ts, ts_sizes):
+        plt.subplot(2,2, ts_sizes.index(i))    
+        plt.title("Training set size={0}".format(i),
+                      fontsize=15)    
+        
+        l_line, = plt.plot(range(1, max_points), errors_by_points_linear, "-o", label="Linear regression")
+        svr_line, = plt.plot(range(1, max_points), errors_by_points_svr, "-*", label="SVR")
+    
+        plt.legend(handles=[l_line, svr_line])   
+        
+        plt.ylim(3.25, 3.75)   
+        
+        plt.xlabel("Points", fontsize=12)
+        plt.ylabel("Mean error", fontsize=12)    
     plt.show()
-    plt.close()
-    
-#        errors_by_points.append(ml_errors[0])
-    
-#    plt.figure(figsize=[7,7])    
-#    plt.title("Mean error by history length", fontsize=15)
-#    plt.plot(range(1,len(errors_by_points)+1), errors_by_points)
-#    plt.xlabel("Points", fontsize=12)
-#    plt.ylabel("Mean error", fontsize=12)    
+#        ens_errors.append(mean(ens_list))
+#        best_errors.append(mean(best_list))
+        
+#    fig = plt.figure(figsize=[7, 7])
+#    plt.title("Error distribution for operative mode")
+#
+#    diffun = mean
+#
+#    plt.axhline(y=diffun(ml_list), linewidth = 1, color = '0.25', 
+#             linestyle = "--", label=median(ml_list))
+#             
+#    plt.annotate("{0:.2f}".format(diffun(ml_list)),
+#                 xy=(3, diffun(ml_list)), xytext=(3.33, diffun(ml_list)+0.1)) 
+#
+#    plt.axhline(y=diffun(ens_list), linewidth = 1, color = '0.25', 
+#             linestyle = "--", label=diffun(ml_list))
+#             
+#    plt.annotate("{0:.2f}".format(diffun(ens_list)),
+#                 xy=(3, diffun(ens_list)), xytext=(3-0.1, 0.1))
+#
+#    res = plt.boxplot(errors_by_time[:3], whis = 'range', showmeans = True)   
+#    plt.xticks([1,2,3], ["ml", "ens", "best"], fontsize = 12)
+#    
+#    plt.xlabel("Ensemble selection approach", fontsize = 15)
+#    plt.ylabel("Error", fontsize=15)     
 #    plt.show()
+#    plt.close()        
+        
+#    plt.figure(figsize=(10, 10))
+#
+#    plt.title("Validation set size={}".format(validate_count), fontsize = 15)
+#
+#    ml_line, = plt.plot(range(max_learn_count-1), ml_errors, label="Predicted") 
+#    ens_line, = plt.plot(range(max_learn_count-1), ens_errors, label="Ensemble")
+#    best_lb, = plt.plot(range(max_learn_count-1), best_errors, label="Best")
+#        
+#    plt.legend(handles=[ml_line, ens_line, best_lb], fontsize = 12)
+#
+#    plt.ylabel("Mean error", fontsize = 12)
+#    plt.xlabel("Training set size", fontsize = 12)
+#
+#    plt.show()
+#    plt.close()
+    

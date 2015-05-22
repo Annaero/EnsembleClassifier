@@ -7,15 +7,14 @@ Created on Wed Apr 29 14:19:26 2015
 
 """
 
-from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression
 from dtw import dtw
-from collections import Counter
+from copy import deepcopy
 
 def get_elements(a, b):
     return [a[i] for i in b]
 
-def dist_mesurement(predicted, actual):
+def dtw_measurement(predicted, actual):
     ln = min(len(predicted), len(actual))
     dist, cost, path = dtw(predicted[:ln], actual[:ln])
     return dist
@@ -32,25 +31,36 @@ def ensemble_predictions(models, coeffs):
 
 class EnsembleClassifier(object):
     _errors_by_ens = list()
+    _known_dist_by_ens = list()
     _best_ensemble_by_time = list()
     _ensembles = list()
     
-    def __init__(self, models, coefs, measurements):
+    def __init__(self, models, coefs, measurements, error_measurement):# = dtw_measurement):
         self._prediction_models = None  
         self._measurements = measurements
         self._ens_count = len(coefs)
         self._p_len = len(models[0][0])
         self._p_period = len(models[0])
 
-#        #find ensemble having most count of non-zero elements        
-#        [sum(map(lambda x: 1 if x!=0 else 0 )) for coef in coefs]
-#        self._biggest_ens = 
-
         self._make_ensembles_predictions(models, coefs)
-            
-    def prepare(self, p_count = 1, distance_measure = dist_mesurement, zero_point_shift = 0):
-        """Make some precalculations"""
         
+        for ensemble in self._ensembles:
+            errors = list()
+            for i in range(self._p_period):
+                predicted = ensemble[i]
+                actual = self._measurements[i*6:]
+                errors.append(error_measurement(predicted, actual))
+            self._errors_by_ens.append(errors)
+        self.__error_by_time = list(zip(*self._errors_by_ens))
+        
+        for predictions in self.__error_by_time:
+            numered_predictions = [(n, p) for p, n in zip(predictions, range(len(predictions)))]
+            current_level = [p[0] for p in sorted(numered_predictions, key=lambda x: x[1])]
+            self._best_ensemble_by_time.append(current_level[0])
+        
+    def prepare(self, p_count = 1,
+                    zero_point_shift = 0):
+        """Make some precalculations""" 
         def get_x(i):
             if i > 0:
                 fst = i * 6 - p_count + 1 + zero_point_shift
@@ -62,40 +72,39 @@ class EnsembleClassifier(object):
                 
             msm = [0]*(p_count-len(msm)) + msm
             return msm
+            
         self._get_x = get_x
-        
         self._x_by_time = [get_x(i) for i in range(self._p_period)]
+    
         
-        for ensemble in self._ensembles:
-            errors = list()
-            for i in range(self._p_period):
-                predicted = ensemble[i]
-                actual = self._measurements[i*6:]
-                errors.append(dist_mesurement(predicted, actual))
-            self._errors_by_ens.append(errors)
-        self.__error_by_time = list(zip(*self._errors_by_ens))
-        
-        levels = []
-        for predictions in self.__error_by_time:
-            numered_predictions = [(n, p) for p, n in zip(predictions, range(len(predictions)))]
-            current_level = [p[0] for p in sorted(numered_predictions, key=lambda x: x[1])]
-            levels.append(current_level)
-#            levels.append((1, sorted(predictions)))
-            
-#        c = Counter(currentLevel)
-        
-            self._best_ensemble_by_time.append(current_level[0])
-        
-    def train(self, training_set):  
+    def train(self, training_set, regression_model = LinearRegression):  
         self._prediction_models = \
-            [LinearRegression() for n in range( self._ens_count)]
+            [regression_model() for n in range(self._ens_count)]
 #            [SVR(kernel='rbf', C=1e6, gamma=0.3) for n in range( self._ens_count)]
-            
-           
+                
         predictors = get_elements(self._x_by_time, training_set)
         for pm, errors in zip(self._prediction_models, self._errors_by_ens):
             predicate = get_elements(errors, training_set)
             pm.fit(predictors, predicate)
+            
+    def find_nearest(self, knowledge_len, error_measurement=dtw_measurement):
+        self._known_dist_by_ens = list()
+        self.__known_dist_by_time = list()
+        for ensemble in self._ensembles:
+            distanses = list()
+            for i in range(self._p_period):
+                predicted = ensemble[i]
+                actual = self._measurements[i * 6 : i * 6 + knowledge_len]
+                distanses.append(error_measurement(predicted, actual))
+            self._known_dist_by_ens.append(distanses)
+        self.__known_dist_by_time = list(zip(*self._known_dist_by_ens))  
+        
+    def get_nearest_ensemble(self, t):
+        distanses = self.__known_dist_by_time[t]
+        nearest = distanses.index(min(distanses))
+        neares_errors = self._errors_by_ens[nearest]        
+        
+        return nearest, neares_errors[t]
 
     def get_predict_to_actual_error(self, t):
         X = self._get_x(t)
@@ -126,4 +135,6 @@ class EnsembleClassifier(object):
         for coef in coefs:
             ensemble = ensemble_predictions(models, coef)
             self._ensembles.append(ensemble)
-        
+    
+    def copy(self):
+        return deepcopy(self)

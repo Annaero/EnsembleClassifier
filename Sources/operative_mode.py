@@ -7,7 +7,21 @@ from scipy.stats import norm
 from EnsembleClassifier import EnsembleClassifier
 from regres import read_data, read_ens_coeffs
 from SelectionStrategy import NoneStrategy     
-from statistics import median, mean    
+from statistics import median, mean  
+from sklearn.metrics import mean_squared_error as MSR
+from sklearn.metrics import mean_absolute_error as MAE
+from math import sqrt
+from dtw import dtw
+       
+def get_dist_fun(distf):
+    def dist_mesurement(predicted, actual):
+        ln = min(len(predicted), len(actual))
+        dist = distf(predicted[:ln], actual[:ln])
+        if(type(dist) is tuple):
+            dist = dist[0]
+        return dist 
+        
+    return dist_mesurement
        
 if __name__ == "__main__":
     path = sys.argv[1]
@@ -27,34 +41,40 @@ if __name__ == "__main__":
     hiromb = read_data(hirombFile)
     
     coefs = list(read_ens_coeffs(coeffsFile))
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-#    errs = []
-    
-    classifier.prepare(2) 
-
+     
     cnt = len(noswan)
     learn_len = 70
     validate_len = cnt - learn_len
-    
-    errors = []
-    ml_errors = []
-    pta_errors = [] #predicted-to-actual
-    strategy = NoneStrategy(classifier)
-    operative_time = list(range(learn_len, cnt))
-    
-    for i in operative_time:
-        training_set = range(i-learn_len, i)
-        strategy.retrain_classifier(training_set)
-        err = strategy.get_next_ensemble(i)
-        pta = classifier.get_predict_to_actual_error(i)
-        errors.append(err)
-        ml_errors.append(err[-2])
-        pta_errors.append(pta)
-            
-    errors_by_time = list(zip(*errors))
-    [bestErr, ensErr, mlErr, _] = errors_by_time
 
-    pta_by_ens = list(zip(*pta_errors))
+    metric_names = ["MAE", "RMSE", "DTW"] 
+    metrics = [MAE, lambda x, y: sqrt(MSR(x,y)), dtw]
+    errors_by_metrics = dict()
+    for metric, metric_name in zip(metrics, metric_names):
+        print(metric_name, metric)
+        dist = get_dist_fun(metric)
+        classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements, dist)
+        classifier.prepare(2)
+        
+        errors = []
+        ml_errors = []
+        pta_errors = [] #predicted-to-actual
+        strategy = NoneStrategy(classifier)
+        operative_time = list(range(learn_len, cnt))
+        
+        for i in operative_time:
+            training_set = range(i - learn_len, i)
+            strategy.retrain_classifier(training_set)
+            err = strategy.get_next_ensemble(i)
+#            pta = classifier.get_predict_to_actual_error(i)
+            errors.append(err[:3])
+#            ml_errors.append(err[-2])
+#            pta_errors.append(pta)
+                
+        errors_by_time = list(zip(*errors))
+#        [bestErr, ensErr, mlErr, _] = errors_by_time
+    
+#        pta_by_ens = list(zip(*pta_errors))
+        errors_by_metrics[metric_name] = errors_by_time
     
 #    errs.append(ml_errors)
      
@@ -66,61 +86,63 @@ if __name__ == "__main__":
 #    plt.ylabel("Mean error", fontsize=12)    
 #    plt.show()
     
-    plt.figure(figsize=[14,12])
-    plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
-    for ens, i in zip(pta_by_ens, range(7)):                
-        plt.subplot(3,3,i+1)
-        models = ["hiromb", "swan", "noswan"]
-        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=12)
-
-        plt.xlim(0,8)
-        plt.ylim(0,8)
-        
-        [p,a] = list(zip(*ens))
-        plt.plot([0,8], [0,8], c="0.5")
-        plt.plot(p, a, "*", c="b")        
-    plt.show()
+#    plt.figure(figsize=[14,12])
+#    plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
+#    for ens, i in zip(pta_by_ens, range(7)):                
+#        plt.subplot(3,3,i+1)
+#        models = ["hiromb", "swan", "noswan"]
+#        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=12)
+#
+#        plt.xlabel("predicted")
+#        plt.ylabel("actual")        
+#        
+#        plt.xlim(0,8)
+#        plt.ylim(0,8)
+#        
+#        [p,a] = list(zip(*ens))
+#        plt.plot([0,8], [0,8], c="0.5")
+#        plt.plot(p, a, "*", c="b")        
+#    plt.show()
     
 
-    plt.figure(figsize=(15,12))      
-    
-    operative_count = int(len(operative_time) / 3 - 20)
-    ml_line, = plt.plot(operative_time[:operative_count], list(mlErr)[:operative_count], label="Predicted") 
-    ens_line, = plt.plot(operative_time[:operative_count], list(ensErr)[:operative_count], label="Ensemble")
-    best_lb, = plt.plot(operative_time[:operative_count], list(bestErr)[:operative_count], "*", label="Best")
-    
-    ml_line.set_antialiased(True)
-    ens_line.set_antialiased(True)    
-    
-    plt.ylabel("Mean error", fontsize=15)
-    plt.xlabel("Time", fontsize=15)    
-    
-    plt.legend(handles=[ml_line, ens_line, best_lb], fontsize=12)
-    plt.title("Operative mode simulation with training set size=70", fontsize=15) 
-    
-    plt.show()
-    plt.close()
+#    plt.figure(figsize=(15,12))      
+#    
+#    operative_count = int(len(operative_time) / 3 - 20)
+#    ml_line, = plt.plot(operative_time[:operative_count],
+#                        list(mlErr)[:operative_count], label="Predicted") 
+#    ens_line, = plt.plot(operative_time[:operative_count],
+#                         list(ensErr)[:operative_count], label="Ensemble")
+#    best_lb, = plt.plot(operative_time[:operative_count],
+#                        list(bestErr)[:operative_count], "*", label="Best")
+#    
+#    ml_line.set_antialiased(True)
+#    ens_line.set_antialiased(True)    
+#    
+#    plt.ylabel("Mean error", fontsize=15)
+#    plt.xlabel("Time", fontsize=15)    
+#    
+#    plt.legend(handles=[ml_line, ens_line, best_lb], fontsize=12)
+#    plt.title("Operative mode simulation with training set size=70", fontsize=15) 
+#    
+#    plt.show()
+#    plt.close()
     
     #Error boxplots
-    fig = plt.figure(figsize=[7, 7])
-    plt.title("Error distribution for operative mode")
+    fig = plt.figure(figsize=[18, 6])
+    plt.suptitle("Error distribution", fontsize = 15)
 
-    res = plt.boxplot(errors_by_time[:3], whis = 'range', showmeans = True)   
-    plt.xticks([1,2,3], ["ml", "ens", "best"], fontsize = 12)
-    
-    plt.xlabel("Ensemble selection approach", fontsize = 15)
-    plt.ylabel("Error", fontsize=15)    
-    
-#    y2 = host.twinx()    
-    plt.axhline(y=median(mlErr), linewidth = 1, color = '0.75', 
-             linestyle = "--", label=median(mlErr))
-             
-    plt.annotate("{0:.2f}".format(median(mlErr)),
-                 xy=(3, median(mlErr)), xytext=(3.33, median(mlErr)+0.15)) 
+    for metric, i in zip(metric_names, range(1, len(metrics) + 1)):
+        plt.subplot(1,3,i)
+        plt.title(metric)
+        
+        plt.boxplot(errors_by_metrics[metric], whis = 'range', showmeans = True)
+        plt.xticks([1,2,3], ["best", "ens", "ml"], fontsize = 11)
+        
+        plt.xlabel("Ensemble selection approach", fontsize = 13)
+        plt.ylabel("Error", fontsize=13)
     
     plt.show()
     plt.close()
     
-    print("Mean error {}".format(mean(mlErr)))
-        
-    
+#    print("Mean error {}".format(mean(mlErr)))
+            

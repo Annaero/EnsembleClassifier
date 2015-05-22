@@ -28,7 +28,7 @@ if __name__ == "__main__":
     
     coefs = list(read_ens_coeffs(coeffsFile))
     classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier.prepare(5) 
+    classifier.prepare(2) 
 
     cnt = len(noswan)
     learn_len = 70
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     
     byth = []
     errors_by_th = []
-    for threshold in np.linspace(0, 1.5, 40):
+    for threshold in np.linspace(0, 1.5, 60):
         errors = []
         strategy = SimpleSelectionStrategy(classifier, threshold)
         for i in range(learn_len, cnt):
@@ -50,9 +50,13 @@ if __name__ == "__main__":
         byth.append((threshold, mean(errors_by_time[-1]), mean(errors_by_time[-2])))
                 
         plt.figure(figsize=(10,12))
-        plt.title("With {} threshold by 100".format(threshold) )
-        plt.boxplot(errors_by_time, showmeans=True, sym='')
-        plt.xticks([1, 2, 3, 4], ['best', 'ens', 'ml', "strategy"])
+#        plt.title("Error dis".format(threshold) )
+
+        plt.axhline(y=mean(errors_by_time[-1]), linewidth = 1, color = '0.25', 
+             linestyle = "--")
+        
+        plt.boxplot(errors_by_time, whis='range', showmeans=True)
+        plt.xticks([1, 2, 3, 4], ['best', 'ens', 'ml', "cons-ml"])
     
         path3 = os.path.join(path2, "strat")
         plt.savefig(os.path.join(path3, "100_{}.png".format(threshold)))
@@ -78,11 +82,12 @@ if __name__ == "__main__":
     
 #    plt.savefig(os.path.join(path2, "mean_strat_100.png"))    
     
-#    plt.show()
-#    plt.close()
+    plt.show()
+    plt.close()
 #    
 #    plt.figure(figsize=[10, 7])
 #
+#    
 #    res = plt.boxplot(errors_by_th, whis='range', showmeans=True)   
 ##    plt.xticks(range(30), np.linspace(0, 1.5, 30), fontsize=12)    
 #    
@@ -93,7 +98,7 @@ if __name__ == "__main__":
 #                    
 #    plt.xlabel("Threshold", fontsize=15)
 #    plt.ylabel("Error", fontsize=15)
-    
-    plt.show()
-    plt.close()
-    
+#    
+#    plt.show()
+#    plt.close()
+#    
