@@ -17,11 +17,17 @@ class NoneStrategy():
         self.__classifier = classifier
         self.__history = list() #(selected, best, error_delta )   
     
-    def retrain_classifier(self, new_trainning_set):
-        self.__classifier.train(new_trainning_set)
+    def retrain_classifier(self, new_trainning_set, with_knowledge=False):
+        if not with_knowledge:
+            self.__classifier.train(new_trainning_set)
+        else:
+            self.__classifier.train_with_data(new_trainning_set)
     
-    def get_next_ensemble(self, t):
-        ml, mlErr = self.__classifier.predict_best_ensemble(t)
+    def get_next_ensemble(self, t, with_knowledge=False):
+        if not with_knowledge:
+            ml, mlErr = self.__classifier.predict_best_ensemble(t)
+        else:
+            ml, mlErr = self.__classifier.predict_best_with_data
         best, bestErr = self.__classifier.get_best_ensemble(t)
         ens, ensErr = self.__classifier.get_biggest_ensemble(t)
     
@@ -33,11 +39,17 @@ class SimpleSelectionStrategy():
         self.__threshold = threshold
         self.__history = list() #(selected, best, error_delta    
     
-    def retrain_classifier(self, new_trainning_set):
-        self.__classifier.train(new_trainning_set)
+    def retrain_classifier(self, new_trainning_set, with_knowledge=False):
+        if not with_knowledge:
+            self.__classifier.train(new_trainning_set)
+        else:
+            self.__classifier.train_with_data(new_trainning_set)   
     
-    def get_next_ensemble(self, t):
-        ml, mlErr = self.__classifier.predict_best_ensemble(t)
+    def get_next_ensemble(self, t, with_knowledge=False):
+        if not with_knowledge:
+            ml, mlErr = self.__classifier.predict_best_ensemble(t)
+        else:
+            ml, mlErr = self.__classifier.predict_best_with_data
         best, bestErr = self.__classifier.get_best_ensemble(t)
         ens, ensErr = self.__classifier.get_biggest_ensemble(t)
         

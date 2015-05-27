@@ -19,8 +19,7 @@ def get_dist_fun(distf):
         dist = distf(predicted[:ln], actual[:ln])
         if(type(dist) is tuple):
             dist = dist[0]
-        return dist 
-        
+        return dist         
     return dist_mesurement
        
 if __name__ == "__main__":
@@ -46,36 +45,52 @@ if __name__ == "__main__":
     learn_len = 70
     validate_len = cnt - learn_len
 
-    metric_names = ["MAE", "RMSE", "DTW"] 
-    metrics = [MAE, lambda x, y: sqrt(MSR(x,y)), dtw]
+#    metric_names = ["MAE", "RMSE", "DTW"] 
+#    metrics = [MAE, lambda x, y: sqrt(MSR(x,y)), dtw]
+    
+    metric_names = [ "RMSE", "MAE", "DTW"] 
+    metrics = [ lambda x, y: sqrt(MSR(x,y)), MAE, dtw]
+    
     errors_by_metrics = dict()
+    tmp = []
+    css = []
     for metric, metric_name in zip(metrics, metric_names):
         print(metric_name, metric)
         dist = get_dist_fun(metric)
         classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements, dist)
         classifier.prepare(2)
+        print(classifier)
         
         errors = []
         ml_errors = []
         pta_errors = [] #predicted-to-actual
-        strategy = NoneStrategy(classifier)
+#        strategy = NoneStrategy(classifier)
         operative_time = list(range(learn_len, cnt))
         
         for i in operative_time:
             training_set = range(i - learn_len, i)
-            strategy.retrain_classifier(training_set)
-            err = strategy.get_next_ensemble(i)
+            
+            classifier.train(training_set)
+            ml, mlErr = classifier.predict_best_ensemble(i)
+            best, bestErr = classifier.get_best_ensemble(i)
+            ens, ensErr = classifier.get_biggest_ensemble(i) 
+            errors.append((bestErr, ensErr, mlErr))
+            
+#            strategy.retrain_classifier(training_set)
+#            err = strategy.get_next_ensemble(i)
 #            pta = classifier.get_predict_to_actual_error(i)
-            errors.append(err[:3])
+#            errors.append(err[:3])
 #            ml_errors.append(err[-2])
 #            pta_errors.append(pta)
                 
+            
         errors_by_time = list(zip(*errors))
+        tmp.append(errors_by_time)
 #        [bestErr, ensErr, mlErr, _] = errors_by_time
     
 #        pta_by_ens = list(zip(*pta_errors))
         errors_by_metrics[metric_name] = errors_by_time
-    
+        css.append(classifier)
 #    errs.append(ml_errors)
      
 #    errors_by_points = [mean(e) for e in errs]
