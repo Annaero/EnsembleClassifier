@@ -47,32 +47,35 @@ if __name__ == "__main__":
     coefs = list(read_ens_coeffs(coeffsFile))
 #    dist = get_dist_fun(lambda x, y: sqrt(MSR(x,y)))
     classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier.prepare(1)
-
-    svr_classifier = classifier.copy()
-    svr_classifier.prepare(2)    
-
-    svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)     
+    classifier.prepare(1)  
+    classifier2 = classifier.copy()
+    
+    strat1 = NoneStrategy(classifier)
+    strat2 = SimpleSelectionStrategy(classifier2, 0.6)
+    
+#    svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)     
     
     cnt = len(noswan)
     learn_len = 70
     start = 1
     pred_len = len(noswan[0])
-#    classifier._ensembles
+
     mean_errors = []
     ml_mean_errors = []
     correctness_rates = []
     ml_correctness_rates = []
     svr_ml_mean_errors = []
     svr_ml_correctness_rates = []
+    
     for kl in range(start, pred_len+1):
         print(kl)
         classifier.find_nearest(knowledge_len = kl)
-        svr_classifier.find_nearest(knowledge_len = kl)
+        classifier2.find_nearest(knowledge_len = kl)
         
         correct = 0
         correct_ml = 0
         correct_svr_ml = 0
+        
         errors = []
         ml_errors = []
         svr_errors = []
@@ -153,8 +156,6 @@ if __name__ == "__main__":
     plt.legend(handles=[s_line, ml_line, svr_line, sml_line, ssvr_line], loc=2)
     
     plt.ylabel("Correctness rate")
-    
-
     
     plt.subplot(1,2,2)      
 
