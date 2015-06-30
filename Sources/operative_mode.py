@@ -4,7 +4,7 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
-from EnsembleClassifier import EnsembleClassifier
+from EnsembleClassifiertmp import EnsembleClassifier
 from regres import read_data, read_ens_coeffs
 from SelectionStrategy import NoneStrategy     
 from statistics import median, mean  
@@ -55,11 +55,9 @@ if __name__ == "__main__":
     tmp = []
     css = []
     for metric, metric_name in zip(metrics, metric_names):
-        print(metric_name, metric)
         dist = get_dist_fun(metric)
         classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements, dist)
         classifier.prepare(2)
-        print(classifier)
         
         errors = []
         ml_errors = []

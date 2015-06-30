@@ -33,7 +33,6 @@ if __name__ == "__main__":
     cnt = len(noswan)
     learn_len = 70
     validate_len = cnt - learn_len
-     
     
     byth = []
     errors_by_th = []

@@ -10,7 +10,7 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
-from EnsembleClassifier import EnsembleClassifier
+from EnsembleClassifiertmp import AssimilationEnsembleClassifier, EnsembleClassifier
 from regres import read_data, read_ens_coeffs
 from SelectionStrategy import SimpleSelectionStrategy 
 from sklearn.metrics import mean_squared_error as MSR    
@@ -46,18 +46,18 @@ if __name__ == "__main__":
     
     coefs = list(read_ens_coeffs(coeffsFile))
 #    dist = get_dist_fun(lambda x, y: sqrt(MSR(x,y)))
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier = AssimilationEnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
     classifier.prepare(1)  
-    classifier2 = classifier.copy()
+    svr_classifier = classifier.copy()
     
-    strat1 = NoneStrategy(classifier)
-    strat2 = SimpleSelectionStrategy(classifier2, 0.6)
+#    strat1 = NoneStrategy(classifier)
+#    strat2 = SimpleSelectionStrategy(classifier2, 0.6)
     
-#    svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)     
+    svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)     
     
     cnt = len(noswan)
     learn_len = 70
-    start = 1
+    start = 35
     pred_len = len(noswan[0])
 
     mean_errors = []
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     for kl in range(start, pred_len+1):
         print(kl)
         classifier.find_nearest(knowledge_len = kl)
-        classifier2.find_nearest(knowledge_len = kl)
+        svr_classifier.find_nearest(knowledge_len = kl)
         
         correct = 0
         correct_ml = 0
@@ -83,12 +83,12 @@ if __name__ == "__main__":
         operative_time = list(range(learn_len, cnt))
         for i in operative_time:
             training_set = range(i - learn_len, i)
-            classifier.train_with_data(training_set)
-            svr_classifier.train_with_data(training_set, svm_model)
+            classifier.train(training_set)
+            svr_classifier.train(training_set, svm_model)
             
             ens, err = classifier.get_nearest_ensemble(i)
-            ml, ml_err = classifier.predict_best_with_data(i)
-            svr_ml, svr_ml_err = svr_classifier.predict_best_with_data(i)
+            ml, ml_err = classifier.predict_best_ensemble(i)
+            svr_ml, svr_ml_err = svr_classifier.predict_best_ensemble(i)
             best_ens, best_err = classifier.get_best_ensemble(i)
             
             errors.append(err)
@@ -119,9 +119,11 @@ if __name__ == "__main__":
     ml_errors = []    
     svr_errors = []
     
+    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier.prepare(1)
+    svr_classifier = classifier.copy()
     for i in operative_time:
         training_set = range(i - learn_len, i)
-        svr_classifier.train(training_set, svm_model)
         svr_classifier.train(training_set, svm_model)
             
         classifier.train(training_set)
