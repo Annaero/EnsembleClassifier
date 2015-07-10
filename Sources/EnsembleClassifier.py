@@ -7,6 +7,16 @@ Created on Wed Apr 29 14:19:26 2015
 
 """
 from sklearn.linear_model import LinearRegression
+
+from pybrain.tools.shortcuts import buildNetwork
+from pybrain.supervised.trainers import BackpropTrainer
+
+from pybrain.structure import FeedForwardNetwork
+from pybrain.structure import LinearLayer, SigmoidLayer
+from pybrain.structure import FullConnection
+from pybrain.datasets import SupervisedDataSet
+
+
 from dtw import dtw
 from copy import deepcopy
 
@@ -173,7 +183,58 @@ class AssimilationEnsembleClassifier(EnsembleClassifierBase):
         
 class ANNEnsembleClassifier(EnsembleClassifierBase): 
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
-        super(ANNEnsembleClassifier, self).
+        super(ANNEnsembleClassifier, self).\
             __init__(models, coefs, measurements, error_measurement)
+        self._ens_combinatinons = [[1 if x!=0 else 0 for x in ens[:-1]] for ens in coefs]
         
-    
+    def prepare(self, p_count = 1, zero_point_shift = 0):
+        super(ANNEnsembleClassifier, self).prepare(p_count, zero_point_shift)
+        self._build_ann(p_count) 
+        self.p_count = p_count
+        
+    def _build_ann(self, inputNeurons = 2):
+        ann = FeedForwardNetwork()        
+        
+        #Make layers
+        inLayer = LinearLayer(inputNeurons)
+        hiddenLayer = SigmoidLayer(3)        
+        outLayer = SigmoidLayer(3)
+        
+        ann.addInputModule(inLayer)
+        ann.addModule(hiddenLayer)
+        ann.addOutputModule(outLayer)
+        
+        #make connections
+        in_to_hidden = FullConnection(inLayer, hiddenLayer)
+        hidden_to_out = FullConnection(hiddenLayer, outLayer)
+        
+        ann.addConnection(in_to_hidden)
+        ann.addConnection(hidden_to_out)    
+        
+        ann.sortModules()
+        
+        self._ann = ann        
+        
+    def train(self, training_set):
+        predictor_points = get_elements(self._x_by_time, training_set)
+        ensembles = get_elements(self._best_ensemble_by_time, training_set)
+        ens_combinations = [self._ens_combinatinons[ens] for ens in ensembles]
+        
+        ds = SupervisedDataSet(self.p_count, 3)
+        for input_data, target in zip(predictor_points, ens_combinations):
+            ds.appendLinked(input_data, target)
+            
+        trainer = BackpropTrainer(self._ann, ds)
+        trainer.trainEpochs(100)
+        
+        
+    def predict_best_ensemble(self, t):
+        X = self._get_x(t)
+        ann_output = self._ann.activate(X)
+        predicted_combination = [1 if x>=0.4 else 0 for x in ann_output]
+        try:
+            predicted_ensemble = self._ens_combinatinons.index(predicted_combination)
+        except:
+            predicted_ensemble = len(self._ens_combinatinons)-1 
+        actual_error = self._errors_by_ens[predicted_ensemble][t]
+        return predicted_ensemble, actual_error  

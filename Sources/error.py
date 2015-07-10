@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.svm import SVR
 from EnsembleClassifier import EnsembleClassifier
+from EnsembleClassifier import ANNEnsembleClassifier
 from regres import read_data, read_ens_coeffs 
 from sklearn.cross_validation import ShuffleSplit
 from statistics import mean, median
@@ -36,61 +37,61 @@ if __name__ == "__main__":
     hiromb = read_data(hirombFile)
     
     coefs = list(read_ens_coeffs(coeffsFile))
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier2 = classifier.copy()
+    #classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier = ANNEnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier.prepare(2)
+   # classifier2 = classifier.copy()
     
     total = len(hiromb)    
     
-    svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)    
+    #svm_model = lambda : SVR(kernel='rbf', C=1e6, gamma=0.3)    
         
 #        learn_count = 30
-    errors_by_ts = []
-    ts_sizes = [30, 70, 120, 145]
+    lin = []
+    bst = []
+    ts_sizes = range(2, 250) #[30, 70, 120, 145]
     for learn_count in ts_sizes:
-        validate_count = total - 150
+        validate_count = total - 250
         variants = 20    
         
-        errors_by_points_linear = []
-        errors_by_points_svr = []
-        max_points = 15
-        for points in range(1, max_points):
-            classifier.prepare(points) 
-            classifier2.prepare(points)
-    
-            linear = []
-            svr = []
+        predicted = []
+        best = []
+        shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
+        for (training_set, validate_set) in shuffle:
+            classifier.train(training_set)
+                #classifier2.train(training_set, regression_model=svm_model)
                 
-            shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
-            for (training_set, validate_set) in shuffle:
-                classifier.train(training_set)
-                classifier2.train(training_set, regression_model=svm_model)
-                
-                linear += [classifier.predict_best_ensemble(i)[1] for i in validate_set] 
-                svr += [classifier2.predict_best_ensemble(i)[1] for i in validate_set]
-                
-            errors_by_points_linear.append(mean(linear))  
-            errors_by_points_svr.append(mean(svr))
-        errors_by_ts.append((errors_by_points_linear, errors_by_points_svr))
-        
+            predicted += [classifier.predict_best_ensemble(i)[1] for i in validate_set] 
+            best += [classifier.get_best_ensemble(i)[1] for i in validate_set] 
+               # svr += [classifier2.predict_best_ensemble(i)[1] for i in validate_set]
+           # errors_by_points_svr.append(mean(svr))
+        #errors_by_ts.append((errors_by_points_linear, errors_by_points_svr))
+        lin.append(mean(predicted))
+        bst.append(mean(best))
         
     plt.figure(figsize=[10,10])
-    plt.suptitle("Mean error by history length\nvalidation set size={0}".format(validate_count),
-                        fontsize = 15)
-    for (errors_by_points_linear, errors_by_points_svr), i in zip(errors_by_ts, ts_sizes):
-        plt.subplot(2,2, ts_sizes.index(i))    
-        plt.title("Training set size={0}".format(i),
-                      fontsize=15)    
-        
-        l_line, = plt.plot(range(1, max_points), errors_by_points_linear, "-o", label="Linear regression")
-        svr_line, = plt.plot(range(1, max_points), errors_by_points_svr, "-*", label="SVR")
-    
-        plt.legend(handles=[l_line, svr_line])   
-        
-        plt.ylim(3.25, 3.75)   
-        
-        plt.xlabel("Points", fontsize=12)
-        plt.ylabel("Mean error", fontsize=12)    
+    plt.plot(ts_sizes, lin, "r-", label="Linear regression")
+    plt.plot(ts_sizes, bst, "g-", label="Linear regression")
     plt.show()
+    plt.close()
+    
+#    plt.suptitle("Mean error by history length\nvalidation set size={0}".format(validate_count),
+#                        fontsize = 15)
+#    for (errors_by_points_linear, errors_by_points_svr), i in zip(errors_by_ts, ts_sizes):
+#        #plt.subplot(2,2, ts_sizes.index(i))    
+#        plt.title("Training set size={0}".format(i),
+#                      fontsize=15)    
+#        
+#        l_line, = plt.plot(range(1, max_points), errors_by_points_linear, "-o", label="Linear regression")
+#        #svr_line, = plt.plot(range(1, max_points), errors_by_points_svr, "-*", label="SVR")
+#    
+#        #plt.legend(handles=[l_line, svr_line])   
+#        
+#        plt.ylim(3.25, 3.75)   
+#        
+#        plt.xlabel("Points", fontsize=12)
+#        plt.ylabel("Mean error", fontsize=12)    
+#    plt.show()
 #        ens_errors.append(mean(ens_list))
 #        best_errors.append(mean(best_list))
         
