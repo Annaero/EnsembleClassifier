@@ -16,6 +16,8 @@ from pybrain.structure import LinearLayer, SigmoidLayer
 from pybrain.structure import FullConnection
 from pybrain.datasets import SupervisedDataSet
 
+from itertools import combinations
+
 
 from dtw import dtw
 from copy import deepcopy
@@ -41,6 +43,7 @@ class EnsembleClassifierBase(object):
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         self._prediction_models = None  
         self._measurements = measurements
+        self._m_count = len(models)
         self._ens_count = len(coefs)
         self._p_len = len(models[0][0])
         self._p_period = len(models[0])
@@ -134,6 +137,7 @@ class EnsembleClassifier(EnsembleClassifierBase):
 class AssimilationEnsembleClassifier(EnsembleClassifierBase):
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         super(AssimilationEnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)    
+
     
     def train(self, training_set, regression_model = LinearRegression):
         self._prediction_models = \
@@ -185,20 +189,32 @@ class ANNEnsembleClassifier(EnsembleClassifierBase):
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         super(ANNEnsembleClassifier, self).\
             __init__(models, coefs, measurements, error_measurement)
+        
         self._ens_combinatinons = [[1 if x!=0 else 0 for x in ens[:-1]] for ens in coefs]
+        
+        self._distances = list()
+        self._models_combinations = list(combinations(range(self._m_count), 2))        
+        for t in range(self._p_period):
+            distances = list()
+            for md1, md2 in self._models_combinations:
+                pred1, pred2 = models[md1][t], models[md2][t]            
+                distance = error_measurement(pred1, pred2)
+                distances.append(distance)
+            self._distances.append(distances)        
         
     def prepare(self, p_count = 1, zero_point_shift = 0):
         super(ANNEnsembleClassifier, self).prepare(p_count, zero_point_shift)
-        self._build_ann(p_count) 
-        self.p_count = p_count
+        self.p_count = p_count        
+        self._build_ann() 
         
-    def _build_ann(self, inputNeurons = 2):
+    def _build_ann(self):
         ann = FeedForwardNetwork()        
         
         #Make layers
-        inLayer = LinearLayer(inputNeurons)
-        hiddenLayer = SigmoidLayer(3)        
-        outLayer = SigmoidLayer(3)
+        comb_count = len(self._models_combinations)        
+        inLayer = LinearLayer(comb_count + self.p_count)
+        outLayer = SigmoidLayer(self._m_count)
+        hiddenLayer = SigmoidLayer((comb_count + self._m_count + self.p_count) / 2)          
         
         ann.addInputModule(inLayer)
         ann.addModule(hiddenLayer)
@@ -216,20 +232,27 @@ class ANNEnsembleClassifier(EnsembleClassifierBase):
         self._ann = ann        
         
     def train(self, training_set):
-        predictor_points = get_elements(self._x_by_time, training_set)
+        train_points = [self._get_x(t) for t in training_set]
+        train_distances = get_elements(self._distances, training_set)   
+        
+        predictor_points = [a+b for a,b in zip(train_distances, train_points)]   
+        print(predictor_points)
+        
         ensembles = get_elements(self._best_ensemble_by_time, training_set)
         ens_combinations = [self._ens_combinatinons[ens] for ens in ensembles]
         
-        ds = SupervisedDataSet(self.p_count, 3)
+        print(self._m_count + self.p_count, len(self._models_combinations) )
+        ds = SupervisedDataSet(self._m_count + self.p_count, len(self._models_combinations))
         for input_data, target in zip(predictor_points, ens_combinations):
+            print(input_data, target)
             ds.appendLinked(input_data, target)
             
         trainer = BackpropTrainer(self._ann, ds)
-        trainer.trainEpochs(100)
+        trainer.trainEpochs(10)
         
         
     def predict_best_ensemble(self, t):
-        X = self._get_x(t)
+        X = self._distances[t] + self._get_x(t)
         ann_output = self._ann.activate(X)
         predicted_combination = [1 if x>=0.4 else 0 for x in ann_output]
         try:
