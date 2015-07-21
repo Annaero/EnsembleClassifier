@@ -60,12 +60,12 @@ if __name__ == "__main__":
         
     
     plt.boxplot(error_lists, whis = 'range', showmeans = True)
-    plt.axhline(y=median(error_lists[-1]), linewidth = 1, color = '0.25', 
+    plt.axhline(y=median(error_lists[-1]), linewidth = 1, color = '0.25',
              linestyle = "--")
-    plt.axhline(y=mean(error_lists[-1]), linewidth = 1, color = '0.25', 
+    plt.axhline(y=mean(error_lists[-1]), linewidth = 1, color = '0.25',
              linestyle = "--")
     plt.xticks([1,2,3], ["best", "ens", "ml"], fontsize = 11)
-        
+
     plt.xlabel("Ensemble selection approach", fontsize = 13)
     plt.ylabel("Error", fontsize=13)
     

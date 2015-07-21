@@ -8,7 +8,7 @@ Created on Wed Apr 29 14:19:26 2015
 """
 from sklearn.linear_model import LinearRegression
 
-from pybrain.tools.shortcuts import buildNetwork
+#from pybrain.tools.shortcuts import buildNetwork
 from pybrain.supervised.trainers import BackpropTrainer
 
 from pybrain.structure import FeedForwardNetwork
@@ -18,6 +18,7 @@ from pybrain.datasets import SupervisedDataSet
 
 from itertools import combinations
 
+import os.path
 
 from dtw import dtw
 from copy import deepcopy
@@ -58,10 +59,10 @@ class EnsembleClassifierBase(object):
                 actual = self._measurements[i*6:]
                 errors.append(error_measurement(predicted, actual))
             self._errors_by_ens.append(errors)
-        self.__error_by_time = list(zip(*self._errors_by_ens))
+        self._error_by_time = list(zip(*self._errors_by_ens))
         
         self._best_ensemble_by_time = list()
-        for predictions in self.__error_by_time:
+        for predictions in self._error_by_time:
             numered_predictions = [(n, p) for p, n in zip(predictions, range(len(predictions)))]
             current_level = [p[0] for p in sorted(numered_predictions, key=lambda x: x[1])]
             self._best_ensemble_by_time.append(current_level[0])  
@@ -87,7 +88,7 @@ class EnsembleClassifierBase(object):
     def get_predict_to_actual_error(self, t):
         X = self._get_x(t)
         predicted_errors = [float(pm.predict(X)) for pm in self._prediction_models]
-        actual_errors = self.__error_by_time[t]
+        actual_errors = self._error_by_time[t]
         return list(zip(predicted_errors, actual_errors))
         
     def _make_ensembles_predictions(self, models, coefs):
@@ -96,6 +97,7 @@ class EnsembleClassifierBase(object):
         for coef in coefs:
             ensemble = ensemble_predictions(models, coef)
             self._ensembles.append(ensemble)
+        self._ensembles_by_time = list(zip(*self._ensembles))
     
     def get_best_ensemble(self, t):
         best_ensemble = self._best_ensemble_by_time[t]
@@ -111,8 +113,15 @@ class EnsembleClassifierBase(object):
         return deepcopy(self)
 
 class EnsembleClassifier(EnsembleClassifierBase):
-    def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
-        super(EnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)
+    def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement,
+                 output_folder=None):
+        super(EnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)      
+        
+        if(output_folder):
+            if not os.path.exists(output_folder):
+                os.makedirs(output_folder)
+            self.train_output = output_folder
+            self.prediction_output = output_folder
     
     def train(self, training_set, regression_model = LinearRegression):  
         self._prediction_models = \
@@ -120,25 +129,51 @@ class EnsembleClassifier(EnsembleClassifierBase):
 #            [SVR(kernel='rbf', C=1e6, gamma=0.3) for n in range( self._ens_count)]
                 
         predictor_points = get_elements(self._x_by_time, training_set)
-        for pm, errors in zip(self._prediction_models, self._errors_by_ens):
+        if(self.train_output):
+            train_output = open(self.train_output + "traint_out", "a")
+            predictor_str = " ".join([";".join(map(str,pnt)) for pnt in predictor_points])      
+            train_output.write(str(training_set[-1] + 1) + "\n" + predictor_str + "\n")      
+        
+        for pm, errors in zip(self._prediction_models, self._errors_by_ens):            
             predicate = get_elements(errors, training_set)           
             pm.fit(predictor_points, predicate)
+            if(self.train_output):
+                predictor_str = " ".join(map(str,predicate))
+                train_output.write(predictor_str + "\n")
+            
+        if(self.train_output):
+            train_output.write("\n")
+            train_output.close()
 
     def predict_best_ensemble(self, t):
         X = self._get_x(t)
         predicted_errors = [pm.predict(X) for pm in self._prediction_models]
         predicted_ensemble = predicted_errors.index(min(predicted_errors))
         
+        if(self.prediction_output):
+            with open(self.prediction_output+str(t), "w") as eout:
+                actual = self._measurements[t*6:]                
+                
+                actual_errors = self._error_by_time[t]
+                predictions = self._ensembles_by_time[t]
+                                
+                eout.write(" ".join(map(str, [0, 0] + actual[:self._p_len])) + "\n")
+                predictions_by_ens = zip(actual_errors, predicted_errors, predictions)
+                for prediction_by_ens in predictions_by_ens:
+                    pred_str = str(prediction_by_ens[0]) + " " + \
+                               str(prediction_by_ens[1]) + " " + \
+                               " ".join(map(str,prediction_by_ens[2])) + "\n"
+                    eout.write(pred_str)
+#                eout.write(str(t),"\n")    
+        
         actual_error = self._errors_by_ens[predicted_ensemble][t]
         return predicted_ensemble, actual_error
         
        
-      
 class AssimilationEnsembleClassifier(EnsembleClassifierBase):
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         super(AssimilationEnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)    
 
-    
     def train(self, training_set, regression_model = LinearRegression):
         self._prediction_models = \
             [regression_model() for n in range(self._ens_count)]
@@ -149,9 +184,9 @@ class AssimilationEnsembleClassifier(EnsembleClassifierBase):
                                           self._errors_by_ens, self._known_dist_by_ens):
             predicate = get_elements(errors, training_set)
             known_dist_predictor = get_elements(known_dist, training_set)
-            predictors = [p + [d] for p, d in zip(predictor_points, known_dist_predictor)]          
+            predictors = [p + [d] for p, d in zip(predictor_points, known_dist_predictor)]
             pm.fit(predictors, predicate)
-            
+        
     def predict_best_ensemble(self, t):    
         X = self._get_x(t)
         distanses = list(self.__known_dist_by_time[t])
@@ -160,7 +195,7 @@ class AssimilationEnsembleClassifier(EnsembleClassifierBase):
         
         actual_error = self._errors_by_ens[predicted_ensemble][t]
         return predicted_ensemble, actual_error
-                   
+        
     def find_nearest(self, knowledge_len, error_measurement=dtw_measurement):
         self._known_dist_by_ens = list()
         self.__known_dist_by_time = list()
@@ -184,7 +219,6 @@ class AssimilationEnsembleClassifier(EnsembleClassifierBase):
         
         return nearest, neares_errors[t]
         
-        
 class ANNEnsembleClassifier(EnsembleClassifierBase): 
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         super(ANNEnsembleClassifier, self).\
@@ -200,21 +234,21 @@ class ANNEnsembleClassifier(EnsembleClassifierBase):
                 pred1, pred2 = models[md1][t], models[md2][t]            
                 distance = error_measurement(pred1, pred2)
                 distances.append(distance)
-            self._distances.append(distances)        
+            self._distances.append(distances)
         
     def prepare(self, p_count = 1, zero_point_shift = 0):
         super(ANNEnsembleClassifier, self).prepare(p_count, zero_point_shift)
-        self.p_count = p_count        
-        self._build_ann() 
+        self.p_count = p_count
+        self._build_ann()
         
     def _build_ann(self):
-        ann = FeedForwardNetwork()        
+        ann = FeedForwardNetwork()
         
         #Make layers
-        comb_count = len(self._models_combinations)        
-        inLayer = LinearLayer(comb_count + self.p_count)
+        comb_count = len(self._models_combinations)
+        inLayer = LinearLayer(comb_count)# + self.p_count)
         outLayer = SigmoidLayer(self._m_count)
-        hiddenLayer = SigmoidLayer((comb_count + self._m_count + self.p_count) / 2)          
+        hiddenLayer = SigmoidLayer((comb_count + self._m_count + self.p_count))# / 2)
         
         ann.addInputModule(inLayer)
         ann.addModule(hiddenLayer)
@@ -225,39 +259,38 @@ class ANNEnsembleClassifier(EnsembleClassifierBase):
         hidden_to_out = FullConnection(hiddenLayer, outLayer)
         
         ann.addConnection(in_to_hidden)
-        ann.addConnection(hidden_to_out)    
+        ann.addConnection(hidden_to_out)
         
         ann.sortModules()
         
-        self._ann = ann        
+        self._ann = ann
         
     def train(self, training_set):
         train_points = [self._get_x(t) for t in training_set]
-        train_distances = get_elements(self._distances, training_set)   
+        train_distances = get_elements(self._distances, training_set)
         
-        predictor_points = [a+b for a,b in zip(train_distances, train_points)]   
-        print(predictor_points)
+        predictor_points = train_distances#[a + b for a, b in zip(train_distances, train_points)]   
+        #print(predictor_points)
         
         ensembles = get_elements(self._best_ensemble_by_time, training_set)
         ens_combinations = [self._ens_combinatinons[ens] for ens in ensembles]
         
-        print(self._m_count + self.p_count, len(self._models_combinations) )
-        ds = SupervisedDataSet(self._m_count + self.p_count, len(self._models_combinations))
-        for input_data, target in zip(predictor_points, ens_combinations):
+        print(self._m_count + self.p_count, len(self._models_combinations))
+        ds = SupervisedDataSet(self._m_count , len(self._models_combinations))#+ self.p_count, len(self._models_combinations))
+        for input_data, target in list(zip(predictor_points, ens_combinations)):
             print(input_data, target)
             ds.appendLinked(input_data, target)
             
         trainer = BackpropTrainer(self._ann, ds)
-        trainer.trainEpochs(10)
-        
+        trainer.trainEpochs(100)
         
     def predict_best_ensemble(self, t):
-        X = self._distances[t] + self._get_x(t)
+        X = self._distances[t] #+ self._get_x(t)
         ann_output = self._ann.activate(X)
         predicted_combination = [1 if x>=0.4 else 0 for x in ann_output]
         try:
             predicted_ensemble = self._ens_combinatinons.index(predicted_combination)
         except:
-            predicted_ensemble = len(self._ens_combinatinons)-1 
+            predicted_ensemble = len(self._ens_combinatinons) - 1
         actual_error = self._errors_by_ens[predicted_ensemble][t]
-        return predicted_ensemble, actual_error  
+        return predicted_ensemble, actual_error
