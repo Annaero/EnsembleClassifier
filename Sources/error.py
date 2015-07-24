@@ -18,6 +18,8 @@ from sklearn.cross_validation import ShuffleSplit
 from statistics import mean, median
 from SelectionStrategy import NoneStrategy
 
+from numpy import percentile, std
+
      
 if __name__ == "__main__":
     path = sys.argv[1]
@@ -38,8 +40,8 @@ if __name__ == "__main__":
     
     coefs = list(read_ens_coeffs(coeffsFile))
     #classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier = ANNEnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier.prepare(2)
+    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier.prepare(1)
    # classifier2 = classifier.copy()
     
     total = len(hiromb)    
@@ -49,13 +51,15 @@ if __name__ == "__main__":
 #        learn_count = 30
     lin = []
     bst = []
-    ts_sizes = range(2, 250) #[30, 70, 120, 145]
+    ns = []
+    ts_sizes = range(1,250) #250) #[30, 70, 120, 145]
     for learn_count in ts_sizes:
         validate_count = total - 250
-        variants = 20    
+        variants = 40    
         
         predicted = []
         best = []
+        ens = []
         shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
         for (training_set, validate_set) in shuffle:
             classifier.train(training_set)
@@ -63,15 +67,34 @@ if __name__ == "__main__":
                 
             predicted += [classifier.predict_best_ensemble(i)[1] for i in validate_set] 
             best += [classifier.get_best_ensemble(i)[1] for i in validate_set] 
+            ens += [classifier.get_biggest_ensemble(i)[1] for i in validate_set]
                # svr += [classifier2.predict_best_ensemble(i)[1] for i in validate_set]
            # errors_by_points_svr.append(mean(svr))
         #errors_by_ts.append((errors_by_points_linear, errors_by_points_svr))
-        lin.append(mean(predicted))
-        bst.append(mean(best))
+        lmn = mean(predicted)
+        lin.append((lmn, min(predicted), max(predicted)))
+        bst.append((mean(best), min(best), max(best)))
+        ns.append((mean(ens), min(ens), max(ens)))
+
+#        lin.append((lmn, lmn-std(predicted)/2, lmn+std(predicted)/2))
+#        bst.append((mean(best), mean(best)-std(best)/2, mean(best)+std(best)/2))
+#        ns.append((mean(ens), mean(ens)-std(ens)/2, mean(ens)+std(ens)/2))        
+        
+#        bst.append((mean(best), percentile(best, 25), percentile(best, 75)))
+        
+    [lmean, l25, l75] = list(zip(*lin))  
+    [bmean, b25, b75] = list(zip(*bst))  
+    [emean, e25, e75] = list(zip(*ns))    
         
     plt.figure(figsize=[10,10])
-    plt.plot(ts_sizes, lin, "r-", label="Linear regression")
-    plt.plot(ts_sizes, bst, "g-", label="Linear regression")
+    plt.plot(ts_sizes, lmean, "r-", label="Linear regression")
+    plt.fill_between(ts_sizes, l25, l75, facecolor="red", alpha=0.2)    
+    
+    plt.plot(ts_sizes, emean, "b-", label="Linear regression")
+    plt.fill_between(ts_sizes, e25, e75, facecolor="blue", alpha=0.5)    
+    
+#    plt.plot(ts_sizes, bmean, "g-", label="Linear regression")
+#    plt.fill_between(ts_sizes, b25, b75, facecolor="green", alpha=0.5)  
     plt.show()
     plt.close()
     

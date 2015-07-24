@@ -117,6 +117,8 @@ class EnsembleClassifier(EnsembleClassifierBase):
                  output_folder=None):
         super(EnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)      
         
+        self.train_output = None
+        self.prediction_output = None
         if(output_folder):
             if not os.path.exists(output_folder):
                 os.makedirs(output_folder)
