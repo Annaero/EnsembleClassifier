@@ -11,14 +11,18 @@ import os.path
 import matplotlib.pyplot as plt
 
 from sklearn.svm import SVR
-from EnsembleClassifier import EnsembleClassifier
+from EnsembleClassifier import EnsembleClassifier,OMEnsembleClassifier
 from EnsembleClassifier import ANNEnsembleClassifier
 from regres import read_data, read_ens_coeffs 
 from sklearn.cross_validation import ShuffleSplit
+from sklearn.utils import shuffle
+
 from statistics import mean, median
 from SelectionStrategy import NoneStrategy
 
-from numpy import percentile, std
+from numpy import percentile, std 
+from collections import defaultdict
+
 
      
 if __name__ == "__main__":
@@ -40,7 +44,7 @@ if __name__ == "__main__":
     
     coefs = list(read_ens_coeffs(coeffsFile))
     #classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier = OMEnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
     classifier.prepare(1)
    # classifier2 = classifier.copy()
     
@@ -52,30 +56,71 @@ if __name__ == "__main__":
     lin = []
     bst = []
     ns = []
-    ts_sizes = range(1,250) #250) #[30, 70, 120, 145]
+    ptas = []
+    ptas_by_ens = []
+    ens_by_place = []
+    best2selected_pred_dist = []
+    best2selected_act_dist = []
+    
+    validate_count = total - 250
+    variants = 40
+    cross_set = list(ShuffleSplit(total, variants, validate_count, 250))
+    
+    max_size = 320
+    ts_sizes = range(1,max_size) #250) #[30, 70, 120, 145]
     for learn_count in ts_sizes:
-        validate_count = total - 250
-        variants = 40    
         
         predicted = []
         best = []
         ens = []
-        shuffle = ShuffleSplit(total, variants, validate_count, learn_count)
-        for (training_set, validate_set) in shuffle:
-            classifier.train(training_set)
-                #classifier2.train(training_set, regression_model=svm_model)
+        pta = []
+        
+        ens_places = [0] * len(coefs)
+        
+        best2selected_pred = []
+        best2selected_act = []
+        
+#        for (training_set, validate_set) in cross_set:
+        for t in range(max_size, total):
+           #ts = training_set[:learn_count]
+#            ts = list(range(t-learn_count, t-8))           
+            classifier.train(t, learn_count)
+            validate_set = [t]
                 
-            predicted += [classifier.predict_best_ensemble(i)[1] for i in validate_set] 
-            best += [classifier.get_best_ensemble(i)[1] for i in validate_set] 
-            ens += [classifier.get_biggest_ensemble(i)[1] for i in validate_set]
-               # svr += [classifier2.predict_best_ensemble(i)[1] for i in validate_set]
-           # errors_by_points_svr.append(mean(svr))
-        #errors_by_ts.append((errors_by_points_linear, errors_by_points_svr))
+            pred_ens, pred_err = classifier.predict_best_ensemble(t)
+            predicted.append(pred_err)
+            
+            best_ens, best_err = classifier.get_best_ensemble(t)
+            best.append(best_err)
+            
+            ens.append(classifier.get_biggest_ensemble(t)[1])
+            pta.append(list(map(lambda x: abs(x[0]-x[1]), 
+                                classifier.get_predict_to_actual_error(t))))
+
+            ensemble_prediction = classifier.get_ens_ranged_by_prediction(t)
+            ens_places[ensemble_prediction.index(best_ens)] += 1
+            
+            pred_pred_err, best_pred_err =  classifier.get_predicted_selected_to_best_error(t)
+            best2selected_pred.append(pred_pred_err - best_pred_err)
+            best2selected_act.append(pred_err - best_err)
+            
+#            full2selected.append(pred_err-)
+
         lmn = mean(predicted)
         lin.append((lmn, min(predicted), max(predicted)))
         bst.append((mean(best), min(best), max(best)))
         ns.append((mean(ens), min(ens), max(ens)))
+        ptas.append((mean(map(mean, pta)), std(list(map(mean, pta)))))
+        pta_by_ens = list(zip(*pta))
+        ptas_by_ens.append((list(map(mean, pta_by_ens)), 
+                            list(map(std, pta_by_ens)),
+                            list(map(max, pta_by_ens)),
+                            list(map(min, pta_by_ens))))
 
+        ens_by_place.append(ens_places)
+
+        best2selected_pred_dist.append(mean(best2selected_pred))
+        best2selected_act_dist.append(mean(best2selected_act))
 #        lin.append((lmn, lmn-std(predicted)/2, lmn+std(predicted)/2))
 #        bst.append((mean(best), mean(best)-std(best)/2, mean(best)+std(best)/2))
 #        ns.append((mean(ens), mean(ens)-std(ens)/2, mean(ens)+std(ens)/2))        
@@ -85,18 +130,92 @@ if __name__ == "__main__":
     [lmean, l25, l75] = list(zip(*lin))  
     [bmean, b25, b75] = list(zip(*bst))  
     [emean, e25, e75] = list(zip(*ns))    
-        
+    
+    
+    ###Mean error by training size    
     plt.figure(figsize=[10,10])
-    plt.plot(ts_sizes, lmean, "r-", label="Linear regression")
-    plt.fill_between(ts_sizes, l25, l75, facecolor="red", alpha=0.2)    
-    
-    plt.plot(ts_sizes, emean, "b-", label="Linear regression")
-    plt.fill_between(ts_sizes, e25, e75, facecolor="blue", alpha=0.5)    
-    
-#    plt.plot(ts_sizes, bmean, "g-", label="Linear regression")
+    plt.title("Mean error by training size")
+    pline, = plt.plot(ts_sizes, lmean, "r-", label="Predicted ensemble")
+#    plt.fill_between(ts_sizes, l25, l75, facecolor="red", alpha=0.2)    
+    fline, = plt.plot(ts_sizes, emean, "b-", label="Full ensemble")
+#    plt.fill_between(ts_sizes, e25, e75, facecolor="blue", alpha=0.5)    
+    bline, = plt.plot(ts_sizes, bmean, "g-", label="Best ensemble")
 #    plt.fill_between(ts_sizes, b25, b75, facecolor="green", alpha=0.5)  
+    plt.ylabel("Mean DTW error, sm")
+    plt.xlabel("Training set size, forecast")
+    plt.legend(handles=[pline, fline, bline])
     plt.show()
     plt.close()
+
+        
+    ###Mean error by training size
+    [pta_mean, pta_std] = list(zip(*ptas))
+    plt.figure(figsize=[10,10])
+    
+    plt.title("Mean error prediction error by training size")
+    mean_line, = plt.plot(ts_sizes, pta_mean, "b-", label="Mean")
+    pta_lower =[m-s for m,s in zip(pta_mean, pta_std)]
+    pta_upper =[m+s for m,s in zip(pta_mean, pta_std)]
+    plt.fill_between(ts_sizes[2:], pta_lower[2:], pta_upper[2:], 
+                         facecolor="blue", alpha=0.5)
+    
+    plt.ylabel("Mean error, sm")
+    plt.xlabel("Training set size, forecast")
+    plt.legend(handles=[mean_line])
+    plt.show()
+    plt.close()
+    
+    plt.figure(figsize=[14,12])
+    plt.suptitle("Error prediction error by training size for each ensemble ")
+    [pta_mean, pta_std, pta_max, pta_min] = zip(*ptas_by_ens)
+    for mn, st, mi, mx, i in zip(zip(*pta_mean), zip(*pta_std),
+                         zip(*pta_min), zip(*pta_max), range(7)):
+      
+        pta_lower =[m-s for m,s in zip(mn, st)]
+        pta_upper =[m+s for m,s in zip(mn, st)]             
+        plt.subplot(3,3,i+1)
+        
+        plt.title("Ensemble {}".format(i+1))
+        plt.plot(ts_sizes[2:], mn[2:])
+        plt.fill_between(ts_sizes[2:], pta_lower[2:], pta_upper[2:], 
+                         facecolor="blue", alpha=0.5)
+        plt.fill_between(ts_sizes[2:], mi[2:], mx[2:], facecolor="red", alpha=0.5)
+        
+        plt.ylim(0, 6)
+      
+    plt.show()
+    plt.close()
+      
+    ###Fraction of predictions
+    plt.figure(figsize=[10,10])
+    plt.title("Fraction of predictions")   
+    plt.stackplot(ts_sizes, *(list(zip(*ens_by_place))), alpha=0.5)
+    plt.ylabel("Count of predictions")
+    plt.xlabel("Training set size, forecast")
+    plt.show()
+    plt.close()
+    
+        
+    ###Mean error by training size
+    plt.figure(figsize=[10,10])
+    plt.title("Best to selected ensemble error distance")
+    pline, = plt.plot(ts_sizes, best2selected_pred_dist, label="Predicted")
+    aline, = plt.plot(ts_sizes, best2selected_act_dist, label="Actual")
+    plt.legend(handles=[pline, aline])
+    plt.ylabel("Mean error")
+    plt.xlabel("Training set size, forecast")
+    plt.show()
+    plt.close()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
 #    plt.suptitle("Mean error by history length\nvalidation set size={0}".format(validate_count),
 #                        fontsize = 15)

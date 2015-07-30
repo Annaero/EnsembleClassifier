@@ -31,7 +31,7 @@ if __name__ == "__main__":
     classifier.prepare(2) 
 
     cnt = len(noswan)
-    learn_len = 70
+    learn_len = 10
     validate_len = cnt - learn_len
     
     byth = []
@@ -49,20 +49,20 @@ if __name__ == "__main__":
         errors_by_time = list(zip(*errors))
         byth.append((threshold, mean(errors_by_time[-1]), mean(errors_by_time[-2])))
                 
-        plt.figure(figsize=(10,12))
-#        plt.title("Error dis".format(threshold) )
-
-        plt.axhline(y=mean(errors_by_time[-1]), linewidth = 1, color = '0.25', 
-             linestyle = "--")
-        
-        plt.boxplot(errors_by_time, whis='range', showmeans=True)
-        plt.xticks([1, 2, 3, 4], ['best', 'ens', 'ml', "cons-ml"])
-    
-        path3 = os.path.join(path2, "strat")
-        plt.savefig(os.path.join(path3, "100_{}.png".format(threshold)))
-        
-#        plt.show()
-        plt.close()
+#        plt.figure(figsize=(10,12))
+##        plt.title("Error dis".format(threshold))
+#
+#        plt.axhline(y=mean(errors_by_time[-1]), linewidth = 1, color = '0.25', 
+#             linestyle = "--")
+#        
+#        plt.boxplot(errors_by_time, whis='range', showmeans=True)
+#        plt.xticks([1, 2, 3, 4], ['best', 'ens', 'ml', "cons-ml"])
+#    
+#        path3 = os.path.join(path2, "strat")
+#        plt.savefig(os.path.join(path3, "100_{}.png".format(threshold)))
+#        
+##        plt.show()
+#        plt.close()
         
     [time, mn, ml] = list(zip(*byth))
 

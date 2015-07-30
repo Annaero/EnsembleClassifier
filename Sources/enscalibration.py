@@ -18,6 +18,7 @@ from dateutil.rrule import rrule, HOURLY
 from sklearn import linear_model
 
 from itertools import product
+from numpy.linalg import lstsq
 
 #MODELS = ["BALTP_FORCE_2m", "BALTP_FORCE_90m", "BALTP_GFS60_2m", 
 #          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP_HIRLAM_2m",
@@ -33,8 +34,8 @@ TABED_MODELS = ["BSM-BS-HIRLAM", "BALTP-90M-GFS", "BALTP-90M-HIRLAM",
 #          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP-90M-GFS",
 #          "BSM_FORCE_WowcSwanAss", "BSM-BS-HIRLAM"]
 
-#MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
-MODELS = ["HIROMB", "BSM-WOWC-HIRLAM", "BSM-BS-HIRLAM"]
+MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
+#MODELS = ["HIROMB", "BSM-WOWC-HIRLAM", "BSM-BS-HIRLAM"]
           
           
 DTFORMAT = "%Y-%m-%d %H:%M:%S"
@@ -100,8 +101,8 @@ if __name__ == "__main__":
     GRN, S1 = read_meserments(path, \
         "GI_C1NB_C1FG_SHEP_restored_20130901000000_01.txt")
 
-    POINT = "GRN"
-    POINT_MSM = GRN
+    POINT = "S1"
+    POINT_MSM =S1
 
     modelsPredictions = list()
     modelTimes = list()
@@ -146,27 +147,26 @@ if __name__ == "__main__":
                     [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]   
             lm.fit(ensemble_predictors, target)
             lm.get_params() 
-            
-            lm.predict
         
             coefs = list(lm.coef_) + [lm.intercept_]
             form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
             coef_str = form_str.format(*coefs)
             ens_coef_file.write(coef_str+"\n")
             print(coef_str)
-        
-        
+            
+            ensemble_predictors = [pred+[1] for pred in ensemble_predictors]
+            print(lstsq(ensemble_predictors, target)[0])
+            
     for model, predictions in zip(MODELS, modelsPredictions):
         if not os.path.exists(path_to_aligned):
             os.makedirs(path_to_aligned)
-            
+                
         with open(os.path.join(path_to_aligned, model), "w+") as aligned_model_file:
             for tm in times:
                 predStr = "\t".join([str(p) for p in predictions[tm]])
                 aligned_model_file.write(predStr)
                 aligned_model_file.write("\n")
                 
-    
     with open(os.path.join(path_to_aligned, "mesur"), "w+") as aligned_mes_file:
         print(times[0])
         print(times[-1])
@@ -175,7 +175,7 @@ if __name__ == "__main__":
         msms = POINT_MSM[get_msm_index(times[0]):get_msm_index(times[-1])+predictLen]
         msms_str = "\n".join([str(m) for m in msms])        
         aligned_mes_file.write(msms_str)
-           # aligned_model_file.write("\n")
+#            aligned_model_file.write("\n")
         
     
     ### list(itertools.product([1,0], repeat=4))

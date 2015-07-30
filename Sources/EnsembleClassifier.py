@@ -91,6 +91,7 @@ class EnsembleClassifierBase(object):
         actual_errors = self._error_by_time[t]
         return list(zip(predicted_errors, actual_errors))
         
+        
     def _make_ensembles_predictions(self, models, coefs):
         self._ensembles = list()
         models.append([[1] * self._p_len for n in range(self._p_period)])
@@ -123,7 +124,7 @@ class EnsembleClassifier(EnsembleClassifierBase):
             if not os.path.exists(output_folder):
                 os.makedirs(output_folder)
             self.train_output = output_folder
-            self.prediction_output = output_folder
+            self.prediction_output = output_folder    
     
     def train(self, training_set, regression_model = LinearRegression):  
         self._prediction_models = \
@@ -170,8 +171,67 @@ class EnsembleClassifier(EnsembleClassifierBase):
         
         actual_error = self._errors_by_ens[predicted_ensemble][t]
         return predicted_ensemble, actual_error
+         
+    def get_ens_ranged_by_prediction(self, t):
+        X = self._get_x(t)
+        predicted_errors = [pm.predict(X) for pm in self._prediction_models]
+        sorted_by_err = sorted([(i, x) for i,x in enumerate(predicted_errors)], 
+                                    key=lambda x: x[1])
+        ens_ranged_by_err = list(map(lambda y: y[0], sorted_by_err))
+        return ens_ranged_by_err
         
-       
+    def get_predicted_selected_to_best_error(self, t):
+        X = self._get_x(t)
+        predicted_errors = [pm.predict(X) for pm in self._prediction_models]
+        
+        best, actual_best = self.get_best_ensemble(t)
+        predicted, actual_best = self.predict_best_ensemble(t)
+        
+        return predicted_errors[predicted], predicted_errors[best]
+        
+        
+class OMEnsembleClassifier(EnsembleClassifier):      
+    def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement,
+                 output_folder=None):
+        super(EnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)
+        
+        self.train_output = None
+        self.prediction_output = None        
+        
+        self._partial_errors_by_ens = list()
+        for ensemble in self._ensembles:
+            partial_errors = dict()
+            for l in range(6, self._p_len, 6):
+                partial_errors[l] = list()
+                for i in range(self._p_period):
+                    predicted = ensemble[i][:l]
+                    actual = self._measurements[i*6:i*6+l]
+                    partial_errors[l].append(error_measurement(predicted, actual))
+            self._partial_errors_by_ens.append(partial_errors)
+    
+    def train(self, t, training_set_size, regression_model = LinearRegression):  
+        self._prediction_models = \
+            [regression_model() for n in range(self._ens_count)]
+#            [SVR(kernel='rbf', C=1e6, gamma=0.3) for n in range( self._ens_count)]
+        
+        for pm, partial_errors, errors in zip(self._prediction_models, 
+                                              self._partial_errors_by_ens,
+                                              self._errors_by_ens):
+            predictor_points = list()
+            predicate = list()
+            for delta in range(1, training_set_size+1):
+                if(delta*6 >= self._p_len):
+#                    for c in range(0, int(self._p_len/6)):
+                    predicate.append(errors[t-delta])
+                    predictor_points.append(self._x_by_time[t-delta])
+                else:
+#                    for c in range(0, delta):
+                    predicate.append(partial_errors[delta*6][t-delta])
+                    predictor_points.append(self._x_by_time[t-delta])
+            
+            pm.fit(predictor_points, predicate)
+
+            
 class AssimilationEnsembleClassifier(EnsembleClassifierBase):
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         super(AssimilationEnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)    
@@ -198,7 +258,7 @@ class AssimilationEnsembleClassifier(EnsembleClassifierBase):
         actual_error = self._errors_by_ens[predicted_ensemble][t]
         return predicted_ensemble, actual_error
         
-    def find_nearest(self, knowledge_len, error_measurement=dtw_measurement):
+    def find_nearest(self, knowledge_len, error_measurement = dtw_measurement):
         self._known_dist_by_ens = list()
         self.__known_dist_by_time = list()
         for ensemble in self._ensembles:

@@ -30,20 +30,20 @@ if __name__ == "__main__":
     coefs = list(read_ens_coeffs(coeffsFile))
      
     cnt = len(noswan)
-    learn_len = 70
+    learn_len = 50
     validate_len = cnt - learn_len
 
     classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier.prepare(2)
+    classifier.prepare(1)
         
     errors = []
     ml_errors = []
     pta_errors = [] #predicted-to-actual
     
     strategy = NoneStrategy(classifier)
-    operative_time = list(range(learn_len, cnt))    
+    operative_time = list(range(50, cnt))    
     for i in operative_time:
-        training_set = range(i - learn_len, i)
+        training_set = range(i - learn_len, i-1)
             
 #        classifier.train(training_set)
 #        ml, mlErr = classifier.predict_best_ensemble(i)
@@ -109,8 +109,8 @@ if __name__ == "__main__":
 #    plt.close()
     
     #Error boxplots
-    fig = plt.figure(figsize=[7, 7])
-    plt.suptitle("Error distribution", fontsize = 15)
+    plt.figure(figsize=[7, 7])
+#    plt.suptitle("Error distribution", fontsize = 15)
 
     plt.boxplot(errors_by_time, whis = 'range', showmeans = True)
     plt.xticks([1,2,3], ["best", "ens", "ml"], fontsize = 11)
@@ -118,6 +118,8 @@ if __name__ == "__main__":
     plt.xlabel("Ensemble selection approach", fontsize = 13)
     plt.ylabel("Error", fontsize=13)
     
+    plt.axhline(mean(errors_by_time[2]), linestyle="--")
+    plt.yticks(range(0,10))
     plt.show()
     plt.close()
    
