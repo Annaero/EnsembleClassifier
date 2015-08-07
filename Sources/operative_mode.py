@@ -77,8 +77,8 @@ if __name__ == "__main__":
         plt.xlabel("predicted")
         plt.ylabel("actual")        
         
-        plt.xlim(0,8)
-        plt.ylim(0,8)
+#        plt.xlim(0,8)
+#        plt.ylim(0,8)
         
         [p,a] = list(zip(*ens))
         plt.plot([0,8], [0,8], c="0.5")

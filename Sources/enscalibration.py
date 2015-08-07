@@ -8,7 +8,7 @@ import pickle
 import sys
 import os.path
 import os
-import matplotlib.pyplot as pyplot
+import matplotlib.pyplot as plt
 
 from collections import OrderedDict
 from dateutil import parser
@@ -156,6 +156,20 @@ if __name__ == "__main__":
             
             ensemble_predictors = [pred+[1] for pred in ensemble_predictors]
             print(lstsq(ensemble_predictors, target)[0])
+            
+            if ens_map==(1,1,1,1):
+                model_predictions = list(zip(*ensemble_predictors))
+                plt.figure()
+                plt.scatter(model_predictions[1], target)
+                plt.show()
+                
+                plt.figure()
+                plt.scatter(model_predictions[0], target)
+                plt.show()
+                
+                plt.figure()
+                plt.scatter(model_predictions[2], target)
+                plt.show()
             
     for model, predictions in zip(MODELS, modelsPredictions):
         if not os.path.exists(path_to_aligned):

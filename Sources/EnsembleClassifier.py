@@ -73,9 +73,10 @@ class EnsembleClassifierBase(object):
         def get_x(i):
             if i > 0:
                 fst = i * 6 - p_count + 1 + zero_point_shift
-                fst = fst if fst>=0 else 0
+                fst = fst if fst >= 0 else 0
                 end = i * 6 + zero_point_shift
                 msm = self._measurements[fst : end + 1]
+                print("{0} to {1} for i=={2}".format(fst,end + 1,i))
             else:
                 msm = [0]*(p_count-1) + [self._measurements[0]]
                 
@@ -178,7 +179,8 @@ class EnsembleClassifier(EnsembleClassifierBase):
         sorted_by_err = sorted([(i, x) for i,x in enumerate(predicted_errors)], 
                                     key=lambda x: x[1])
         ens_ranged_by_err = list(map(lambda y: y[0], sorted_by_err))
-        return ens_ranged_by_err
+        actual_errors = [self._errors_by_ens[ens][t] for ens in ens_ranged_by_err]        
+        return ens_ranged_by_err, actual_errors
         
     def get_predicted_selected_to_best_error(self, t):
         X = self._get_x(t)

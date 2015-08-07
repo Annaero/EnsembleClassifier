@@ -54,6 +54,7 @@ if __name__ == "__main__":
         
 #        learn_count = 30
     lin = []
+    lin_s = []
     bst = []
     ns = []
     ptas = []
@@ -71,6 +72,7 @@ if __name__ == "__main__":
     for learn_count in ts_sizes:
         
         predicted = []
+        spred = []
         best = []
         ens = []
         pta = []
@@ -97,10 +99,11 @@ if __name__ == "__main__":
             pta.append(list(map(lambda x: abs(x[0]-x[1]), 
                                 classifier.get_predict_to_actual_error(t))))
 
-            ensemble_prediction = classifier.get_ens_ranged_by_prediction(t)
+            ensemble_prediction, actual_errors = classifier.get_ens_ranged_by_prediction(t)
             ens_places[ensemble_prediction.index(best_ens)] += 1
+            spred.append(actual_errors[1:])
             
-            pred_pred_err, best_pred_err =  classifier.get_predicted_selected_to_best_error(t)
+            pred_pred_err, best_pred_err = classifier.get_predicted_selected_to_best_error(t)
             best2selected_pred.append(pred_pred_err - best_pred_err)
             best2selected_act.append(pred_err - best_err)
             
@@ -108,6 +111,7 @@ if __name__ == "__main__":
 
         lmn = mean(predicted)
         lin.append((lmn, min(predicted), max(predicted)))
+        lin_s.append([mean(p) for p in zip(*spred)])
         bst.append((mean(best), min(best), max(best)))
         ns.append((mean(ens), min(ens), max(ens)))
         ptas.append((mean(map(mean, pta)), std(list(map(mean, pta)))))
@@ -127,9 +131,11 @@ if __name__ == "__main__":
         
 #        bst.append((mean(best), percentile(best, 25), percentile(best, 75)))
         
-    [lmean, l25, l75] = list(zip(*lin))  
-    [bmean, b25, b75] = list(zip(*bst))  
-    [emean, e25, e75] = list(zip(*ns))    
+    [lmean, l25, l75] = list(zip(*lin))
+    [bmean, b25, b75] = list(zip(*bst))
+    [emean, e25, e75] = list(zip(*ns))
+    
+    mean_err_by_place = list(zip(*lin_s))
     
     
     ###Mean error by training size    
@@ -140,10 +146,16 @@ if __name__ == "__main__":
     fline, = plt.plot(ts_sizes, emean, "b-", label="Full ensemble")
 #    plt.fill_between(ts_sizes, e25, e75, facecolor="blue", alpha=0.5)    
     bline, = plt.plot(ts_sizes, bmean, "g-", label="Best ensemble")
-#    plt.fill_between(ts_sizes, b25, b75, facecolor="green", alpha=0.5)  
+#    plt.fill_between(ts_sizes, b25, b75, facecolor="green", alpha=0.5) 
+    
+    lines = []
+    for place, i in zip(mean_err_by_place, range(2, len(mean_err_by_place))):
+        line, = plt.plot(ts_sizes, place, "-", label="Predicted ensemble on {}".format(i))
+        lines.append(line)
+    
     plt.ylabel("Mean DTW error, sm")
     plt.xlabel("Training set size, forecast")
-    plt.legend(handles=[pline, fline, bline])
+    plt.legend(handles=[pline, fline, bline]+lines)
     plt.show()
     plt.close()
 
@@ -197,15 +209,15 @@ if __name__ == "__main__":
     
         
     ###Mean error by training size
-    plt.figure(figsize=[10,10])
-    plt.title("Best to selected ensemble error distance")
-    pline, = plt.plot(ts_sizes, best2selected_pred_dist, label="Predicted")
-    aline, = plt.plot(ts_sizes, best2selected_act_dist, label="Actual")
-    plt.legend(handles=[pline, aline])
-    plt.ylabel("Mean error")
-    plt.xlabel("Training set size, forecast")
-    plt.show()
-    plt.close()
+#    plt.figure(figsize=[10,10])
+#    plt.title("Best to selected ensemble error distance")
+#    pline, = plt.plot(ts_sizes, best2selected_pred_dist, label="Predicted")
+#    aline, = plt.plot(ts_sizes, best2selected_act_dist, label="Actual")
+#    plt.legend(handles=[pline, aline])
+#    plt.ylabel("Mean error")
+#    plt.xlabel("Training set size, forecast")
+#    plt.show()
+#    plt.close()
     
     
     
