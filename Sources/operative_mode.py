@@ -4,7 +4,7 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
-from EnsembleClassifier import EnsembleClassifier
+from EnsembleClassifier import EnsembleClassifier, OMEnsembleClassifier
 from regres import read_data, read_ens_coeffs
 from SelectionStrategy import NoneStrategy     
 from statistics import median, mean  
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     learn_len = 50
     validate_len = cnt - learn_len
 
-    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier = OMEnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
     classifier.prepare(1)
         
     errors = []
@@ -43,7 +43,7 @@ if __name__ == "__main__":
     strategy = NoneStrategy(classifier)
     operative_time = list(range(50, cnt))    
     for i in operative_time:
-        training_set = range(i - learn_len, i-1)
+#        training_set = range(i - learn_len, i-1)
             
 #        classifier.train(training_set)
 #        ml, mlErr = classifier.predict_best_ensemble(i)
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 #        ens, ensErr = classifier.get_biggest_ensemble(i) 
 #        errors.append((bestErr, ensErr, mlErr))
             
-        strategy.retrain_classifier(training_set)
+        strategy.retrain_classifier(i)
         err = strategy.get_next_ensemble(i)
         pta = classifier.get_predict_to_actual_error(i)
         errors.append(err[:3])
