@@ -4,29 +4,35 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
-from EnsembleClassifier import EnsembleClassifier, OMEnsembleClassifier
+from EnsembleClassifier import EnsembleClassifier
 from regres import read_data, read_ens_coeffs
 from SelectionStrategy import NoneStrategy     
 from statistics import median, mean  
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error as MSR
+from sklearn.metrics import mean_absolute_error as MAE
 from math import sqrt
+from dtw import dtw
        
-def rmse(actual, predicted):
-    ln = min(len(predicted), len(actual))
-    rmse = sqrt(mean_squared_error(actual[:ln], predicted[:ln]))
-    return rmse
+def get_dist_fun(distf):
+    def dist_mesurement(predicted, actual):
+        ln = min(len(predicted), len(actual))
+        dist = distf(predicted[:ln], actual[:ln])
+        if(type(dist) is tuple):
+            dist = dist[0]
+        return dist         
+    return dist_mesurement
        
 if __name__ == "__main__":
     path = sys.argv[1]
     path2 = sys.argv[2]
 
     MODEL = "S1"
-    
+
     measurementsFile = os.path.join(path, "2011080100_measurements_{}_2623.txt".format(MODEL))
     noswanFile = os.path.join(path, "2011080100_noswan_{}_48x434.txt".format(MODEL))
     swanFile = os.path.join(path, "2011080100_swan_{}_48x434.txt".format(MODEL))
     hirombFile = os.path.join(path, "2011080100_hiromb_{}_60x434.txt".format(MODEL))
-    coeffsFile = os.path.join(path2, "ens_coefs.txt")
+    coeffsFile = os.path.join(path, "ens_coefs.txt")
     
     measurements = read_data(measurementsFile)
     noswan = read_data(noswanFile)
@@ -36,64 +42,78 @@ if __name__ == "__main__":
     coefs = list(read_ens_coeffs(coeffsFile))
      
     cnt = len(noswan)
-    learn_len = 50
+    learn_len = 70
     validate_len = cnt - learn_len
-
-    classifier = OMEnsembleClassifier([hiromb, swan, noswan], 
-                                      coefs, measurements)#,  error_measurement=rmse)
-    classifier.prepare(1)
+    
+    metric_names = [ "RMSE", "MAE", "DTW"] 
+    metrics = [ lambda x, y: sqrt(MSR(x,y)), MAE, dtw]
+    
+    errors_by_metrics = dict()
+    tmp = []
+    css = []
+#    for metric, metric_name in zip(metrics, metric_names):
+    dist = get_dist_fun(dtw)
+    classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements,
+                    dist, output_folder=os.path.join(path2,"eout/"))
+    classifier.prepare(2)
         
     errors = []
     ml_errors = []
     pta_errors = [] #predicted-to-actual
-    level = []
-    strategy = NoneStrategy(classifier)
+    
+#    strategy = NoneStrategy(classifier)
     operative_time = list(range(learn_len, cnt))    
     for i in operative_time:
-#        training_set = range(i - learn_len, i-1)
+        training_set = range(i - learn_len, i)
             
-        classifier.train(i, learn_len)
-#        classifier.train(training_set)
+        classifier.train(training_set)
         ml, mlErr = classifier.predict_best_ensemble(i)
         best, bestErr = classifier.get_best_ensemble(i)
         ens, ensErr = classifier.get_biggest_ensemble(i) 
         errors.append((bestErr, ensErr, mlErr))
-        ml_errors.append(mlErr)
             
-#        strategy.retrain_classifier(i)
+#        strategy.retrain_classifier(training_set)
 #        err = strategy.get_next_ensemble(i)
-        pta = classifier.get_predict_to_actual_error(i)
+#        pta = classifier.get_predict_to_actual_error(i)
 #        errors.append(err[:3])
 #        ml_errors.append(err[-2])
-        pta_errors.append(pta)
+#        pta_errors.append(pta)
                 
-        level.append(ml)
             
         errors_by_time = list(zip(*errors))
 #        tmp.append(errors_by_time)
 #        [bestErr, ensErr, mlErr, _] = errors_by_time
     
-        pta_by_ens = list(zip(*pta_errors))
+#        pta_by_ens = list(zip(*pta_errors))
+#        errors_by_metrics[metric_name] = errors_by_time
 #        css.append(classifier)
 #    errs.append(ml_errors)
+     
+#    errors_by_points = [mean(e) for e in errs]
+#    plt.figure(figsize=[7,7])  
+#    plt.title("Mean error by history length", fontsize=15)
+#    plt.plot(range(1,len(errors_by_points)+1), errors_by_points)
+#    plt.xlabel("Points", fontsize=12)
+#    plt.ylabel("Mean error", fontsize=12)    
+#    plt.show()
     
-    plt.figure(figsize=[15,13])
-    plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
-    for ens, i in zip(pta_by_ens, range(7)):                
-        plt.subplot(3,3,i+1)
-        models = ["hiromb", "swan", "noswan"]
-        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=12)
-
-        plt.xlabel("predicted")
-        plt.ylabel("actual")        
-        
-        plt.xlim(0,10)
-        plt.ylim(0,10)
-        
-        [p,a] = list(zip(*ens))
-        plt.plot([0,10], [0,10], c="0.5")
-        plt.plot(p, a, "*", c="b")        
-    plt.show()
+#    plt.figure(figsize=[14,12])
+#    plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
+#    for ens, i in zip(pta_by_ens, range(7)):                
+#        plt.subplot(3,3,i+1)
+#        models = ["hiromb", "swan", "noswan"]
+#        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=12)
+#
+#        plt.xlabel("predicted")
+#        plt.ylabel("actual")        
+#        
+#        plt.xlim(0,8)
+#        plt.ylim(0,8)
+#        
+#        [p,a] = list(zip(*ens))
+#        plt.plot([0,8], [0,8], c="0.5")
+#        plt.plot(p, a, "*", c="b")        
+#    plt.show()
     
 
 #    plt.figure(figsize=(15,12))      
@@ -119,19 +139,23 @@ if __name__ == "__main__":
 #    plt.close()
     
     #Error boxplots
-    plt.figure(figsize=[7, 7])
-#    plt.suptitle("Error distribution", fontsize = 15)
+    fig = plt.figure(figsize=[7, 7])
+    plt.suptitle("Error distribution", fontsize = 15)
 
+#    for metric, i in zip(metric_names, range(1, len(metrics) + 1)):
+#        plt.subplot(1,3,i)
+#        plt.title(metric)
+        
+#        plt.boxplot(errors_by_metrics[metric], whis = 'range', showmeans = True)
     plt.boxplot(errors_by_time, whis = 'range', showmeans = True)
     plt.xticks([1,2,3], ["best", "ens", "ml"], fontsize = 11)
         
     plt.xlabel("Ensemble selection approach", fontsize = 13)
     plt.ylabel("Error", fontsize=13)
     
-    plt.axhline(mean(errors_by_time[2]), linestyle="--")
-    plt.yticks(range(0,10))
     plt.show()
     plt.close()
    
+    
 #    print("Mean error {}".format(mean(mlErr)))
             

@@ -23,11 +23,11 @@ from SelectionStrategy import NoneStrategy
 from numpy import percentile, std 
 from collections import defaultdict
 
-
+from enscalibration_3 import calibrate_ensemble
      
 if __name__ == "__main__":
     path = sys.argv[1]
-#    path2 = sys.argv[2]
+    path2 = sys.argv[2]
 
     MODEL = "S1"
 
@@ -35,7 +35,8 @@ if __name__ == "__main__":
     noswanFile = os.path.join(path, "2011080100_noswan_{}_48x434.txt".format(MODEL))
     swanFile = os.path.join(path, "2011080100_swan_{}_48x434.txt".format(MODEL))
     hirombFile = os.path.join(path, "2011080100_hiromb_{}_60x434.txt".format(MODEL))
-    coeffsFile = os.path.join(path, "ens_coefs.txt")
+    coeffsFile = os.path.join(path2, "ens_coefs.txt")
+#    coeffsFile = "../Data/NewEns/ens_coefs.txt"
     
     measurements = read_data(measurementsFile)
     noswan = read_data(noswanFile)
@@ -43,9 +44,11 @@ if __name__ == "__main__":
     hiromb = read_data(hirombFile)
     
     coefs = list(read_ens_coeffs(coeffsFile))
-    #classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
-    classifier = OMEnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    classifier = OMEnsembleClassifier([hiromb, swan, noswan], 
+                                              coefs, measurements)#, error_measurement=rmse)
     classifier.prepare(1)
+    #classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
+    
    # classifier2 = classifier.copy()
     
     total = len(hiromb)    
@@ -67,9 +70,14 @@ if __name__ == "__main__":
     variants = 40
     cross_set = list(ShuffleSplit(total, variants, validate_count, 250))
     
-    max_size = 320
-    ts_sizes = range(1,max_size) #250) #[30, 70, 120, 145]
+    max_size = 250
+    ts_sizes = range(1, max_size) #250) #[30, 70, 120, 145]
     for learn_count in ts_sizes:
+#        coefs = list(calibrate_ensemble([hiromb, swan, noswan],
+#                                            measurements, learn_count))
+#        classifier = OMEnsembleClassifier([hiromb, swan, noswan], 
+#                                              coefs, measurements)
+#        classifier.prepare(1)
         
         predicted = []
         spred = []
@@ -149,9 +157,9 @@ if __name__ == "__main__":
 #    plt.fill_between(ts_sizes, b25, b75, facecolor="green", alpha=0.5) 
     
     lines = []
-    for place, i in zip(mean_err_by_place, range(2, len(mean_err_by_place))):
-        line, = plt.plot(ts_sizes, place, "-", label="Predicted ensemble on {}".format(i))
-        lines.append(line)
+#    for place, i in zip(mean_err_by_place, range(2, len(mean_err_by_place))):
+#        line, = plt.plot(ts_sizes, place, "-", label="Predicted ensemble on {}".format(i))
+#        lines.append(line)
     
     plt.ylabel("Mean DTW error, sm")
     plt.xlabel("Training set size, forecast")
@@ -200,7 +208,7 @@ if __name__ == "__main__":
       
     ###Fraction of predictions
     plt.figure(figsize=[10,10])
-    plt.title("Fraction of predictions")   
+    plt.title("Fraction of predictions")
     plt.stackplot(ts_sizes, *(list(zip(*ens_by_place))), alpha=0.5)
     plt.ylabel("Count of predictions")
     plt.xlabel("Training set size, forecast")
@@ -217,17 +225,7 @@ if __name__ == "__main__":
 #    plt.ylabel("Mean error")
 #    plt.xlabel("Training set size, forecast")
 #    plt.show()
-#    plt.close()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+#    plt.close()  
     
 #    plt.suptitle("Mean error by history length\nvalidation set size={0}".format(validate_count),
 #                        fontsize = 15)

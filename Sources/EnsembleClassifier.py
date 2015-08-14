@@ -76,7 +76,7 @@ class EnsembleClassifierBase(object):
                 fst = fst if fst >= 0 else 0
                 end = i * 6 + zero_point_shift
                 msm = self._measurements[fst : end + 1]
-                print("{0} to {1} for i=={2}".format(fst,end + 1,i))
+#                print("{0} to {1} for i=={2}".format(fst,end + 1,i))
             else:
                 msm = [0]*(p_count-1) + [self._measurements[0]]
                 
@@ -109,7 +109,7 @@ class EnsembleClassifierBase(object):
         return self._ens_count - 1, self._errors_by_ens[-1][t]
         
     def get_ensemble(self, t, ensemble):
-        return ensemble, self._errors_by_ens[ensemble][t]     
+        return ensemble, self._errors_by_ens[ensemble][t]
     
     def copy(self):
         return deepcopy(self)
@@ -191,6 +191,12 @@ class EnsembleClassifier(EnsembleClassifierBase):
         
         return predicted_errors[predicted], predicted_errors[best]
         
+    def get_forecasts(self, t):
+        pred, pred_err = self.predict_best_ensemble(t)        
+        pred_fcst = self._ensembles_by_time[t][pred]
+        full_fcst = self._ensembles_by_time[t][-1]    
+        
+        return pred_fcst, full_fcst
         
 class OMEnsembleClassifier(EnsembleClassifier):      
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement,

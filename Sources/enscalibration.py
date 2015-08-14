@@ -34,8 +34,8 @@ TABED_MODELS = ["BSM-BS-HIRLAM", "BALTP-90M-GFS", "BALTP-90M-HIRLAM",
 #          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP-90M-GFS",
 #          "BSM_FORCE_WowcSwanAss", "BSM-BS-HIRLAM"]
 
-MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
-#MODELS = ["HIROMB", "BSM-WOWC-HIRLAM", "BSM-BS-HIRLAM"]
+#MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
+MODELS = ["HIROMB", "BSM-WOWC-HIRLAM", "BSM-BS-HIRLAM"]
           
           
 DTFORMAT = "%Y-%m-%d %H:%M:%S"
@@ -85,7 +85,7 @@ def read_predictions(path, model, point):
             dt = parser.parse(timestr, dayfirst=True, yearfirst=True)
             times.append(dt)
             if model=="HIROMB":    
-                predictions[dt] = [float(l) - 37.356 for l in pr]
+                predictions[dt] = [float(l) - 34.356 for l in pr]
             else:
                 predictions[dt] = [float(l) for l in pr]
             predictLen = len(tokens[2:])
@@ -102,7 +102,7 @@ if __name__ == "__main__":
         "GI_C1NB_C1FG_SHEP_restored_20130901000000_01.txt")
 
     POINT = "S1"
-    POINT_MSM =S1
+    POINT_MSM = S1
 
     modelsPredictions = list()
     modelTimes = list()
@@ -135,12 +135,16 @@ if __name__ == "__main__":
                 in zip([prd[tm] for prd in modelsPredictions], predictors):
             predictor.extend(currentPrediction[:target_len])
         target.extend(msm)
+             
+    
+#    modelsPredictions = [hiromb, swan, noswan]    
+    
         
     #predictors.append([1] * len(predictors[0]))
         
     print(*MODELS)
-    with open(os.path.join(path_to_aligned, "ens_coef.txt"), "w+") as ens_coef_file:
-        for ens_map in product([1,0], repeat = len(MODELS)):
+    with open(os.path.join(path_to_aligned, "ens_coefs.txt"), "w+") as ens_coef_file:
+        for ens_map in reversed(list(product([1,0], repeat = len(MODELS)))):
             lm = linear_model.LinearRegression()
             
             ensemble_predictors = \
@@ -155,21 +159,21 @@ if __name__ == "__main__":
             print(coef_str)
             
             ensemble_predictors = [pred+[1] for pred in ensemble_predictors]
-            print(lstsq(ensemble_predictors, target)[0])
+#            print(lstsq(ensemble_predictors, target)[0])
             
-            if ens_map==(1,1,1,1):
-                model_predictions = list(zip(*ensemble_predictors))
-                plt.figure()
-                plt.scatter(model_predictions[1], target)
-                plt.show()
-                
-                plt.figure()
-                plt.scatter(model_predictions[0], target)
-                plt.show()
-                
-                plt.figure()
-                plt.scatter(model_predictions[2], target)
-                plt.show()
+#            if ens_map==(1,1,1):
+#                model_predictions = list(zip(*ensemble_predictors))
+#                plt.figure()
+#                plt.scatter(model_predictions[1], target)
+#                plt.show()
+#                
+#                plt.figure()
+#                plt.scatter(model_predictions[0], target)
+#                plt.show()
+#                
+#                plt.figure()
+#                plt.scatter(model_predictions[2], target)
+#                plt.show()
             
     for model, predictions in zip(MODELS, modelsPredictions):
         if not os.path.exists(path_to_aligned):
