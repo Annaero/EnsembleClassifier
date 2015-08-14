@@ -20,7 +20,7 @@ if __name__ == "__main__":
     path = sys.argv[1]
     path2 = sys.argv[2]
 
-    MODEL = "S1"
+    MODEL = "GI"
     
     measurementsFile = os.path.join(path, "2011080100_measurements_{}_2623.txt".format(MODEL))
     noswanFile = os.path.join(path, "2011080100_noswan_{}_48x434.txt".format(MODEL))
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     coefs = list(read_ens_coeffs(coeffsFile))
      
     cnt = len(noswan)
-    learn_len = 50
+    learn_len = 45
     validate_len = cnt - learn_len
 
     classifier = OMEnsembleClassifier([hiromb, swan, noswan], 
@@ -48,7 +48,8 @@ if __name__ == "__main__":
     pta_errors = [] #predicted-to-actual
     level = []
     strategy = NoneStrategy(classifier)
-    operative_time = list(range(learn_len, cnt))    
+    operative_time = list(range(learn_len, cnt))       
+    
     for i in operative_time:
 #        training_set = range(i - learn_len, i-1)
             
@@ -69,29 +70,31 @@ if __name__ == "__main__":
                 
         level.append(ml)
             
-        errors_by_time = list(zip(*errors))
+    errors_by_time = list(zip(*errors))
 #        tmp.append(errors_by_time)
 #        [bestErr, ensErr, mlErr, _] = errors_by_time
     
-        pta_by_ens = list(zip(*pta_errors))
+    pta_by_ens = list(zip(*pta_errors))
 #        css.append(classifier)
 #    errs.append(ml_errors)
     
     plt.figure(figsize=[15,13])
     plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
-    for ens, i in zip(pta_by_ens, range(7)):                
-        plt.subplot(3,3,i+1)
-        models = ["hiromb", "swan", "noswan"]
-        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=12)
+    for ens, i in zip(pta_by_ens[1:], range(1,8)):                
+        plt.subplot(3,3,i)
+        models = ["HIROMB", "BSM-SWAN", "BSM-NOSWAN"]
+        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=17)
 
-        plt.xlabel("predicted")
-        plt.ylabel("actual")        
+#        plt.xlabel("Predicted RMSE, cm")
+#        plt.ylabel("Actual RMSE, cm")
         
-        plt.xlim(0,10)
-        plt.ylim(0,10)
+        mmax = 15        
+        
+        plt.xlim(0 ,mmax)
+        plt.ylim(0, mmax)
         
         [p,a] = list(zip(*ens))
-        plt.plot([0,10], [0,10], c="0.5")
+        plt.plot([0, mmax], [0, mmax], c="0.5")
         plt.plot(p, a, "*", c="b")        
     plt.show()
     
@@ -123,15 +126,17 @@ if __name__ == "__main__":
 #    plt.suptitle("Error distribution", fontsize = 15)
 
     plt.boxplot(errors_by_time, whis = 'range', showmeans = True)
-    plt.xticks([1,2,3], ["best", "ens", "ml"], fontsize = 11)
+    plt.xticks([1,2,3], ["best", "Full", "Selected"], fontsize = 17)
         
-    plt.xlabel("Ensemble selection approach", fontsize = 13)
-    plt.ylabel("Error", fontsize=13)
+#    plt.xlabel("Ensemble", fontsize = 17)
+    plt.ylabel("RMSE", fontsize=17)
     
-    plt.axhline(mean(errors_by_time[2]), linestyle="--")
-    plt.yticks(range(0,10))
+#    plt.axhline(mean(errors_by_time[2]), linestyle="--")
+    plt.yticks(range(0,12))
     plt.show()
     plt.close()
+    
+    plt.hist(level, 8)
    
 #    print("Mean error {}".format(mean(mlErr)))
             

@@ -24,7 +24,14 @@ from numpy import percentile, std
 from collections import defaultdict
 
 from enscalibration_3 import calibrate_ensemble
-     
+
+from math import sqrt
+        
+def rmse(actual, predicted):
+    ln = min(len(predicted), len(actual))
+    rmse = sqrt(mean_squared_error(actual[:ln], predicted[:ln]))
+    return rmse
+    
 if __name__ == "__main__":
     path = sys.argv[1]
     path2 = sys.argv[2]
@@ -45,7 +52,7 @@ if __name__ == "__main__":
     
     coefs = list(read_ens_coeffs(coeffsFile))
     classifier = OMEnsembleClassifier([hiromb, swan, noswan], 
-                                              coefs, measurements)#, error_measurement=rmse)
+                                              coefs, measurements, error_measurement=rmse)
     classifier.prepare(1)
     #classifier = EnsembleClassifier([hiromb, swan, noswan], coefs, measurements)
     
@@ -70,7 +77,7 @@ if __name__ == "__main__":
     variants = 40
     cross_set = list(ShuffleSplit(total, variants, validate_count, 250))
     
-    max_size = 250
+    max_size = 100
     ts_sizes = range(1, max_size) #250) #[30, 70, 120, 145]
     for learn_count in ts_sizes:
 #        coefs = list(calibrate_ensemble([hiromb, swan, noswan],
@@ -148,12 +155,12 @@ if __name__ == "__main__":
     
     ###Mean error by training size    
     plt.figure(figsize=[10,10])
-    plt.title("Mean error by training size")
-    pline, = plt.plot(ts_sizes, lmean, "r-", label="Predicted ensemble")
+    plt.title("Mean error by training size", fontsize=15)
+    pline, = plt.plot(ts_sizes, lmean, "r-", label="Predicted ensemble", linewidth=2.0)
 #    plt.fill_between(ts_sizes, l25, l75, facecolor="red", alpha=0.2)    
-    fline, = plt.plot(ts_sizes, emean, "b-", label="Full ensemble")
+    fline, = plt.plot(ts_sizes, emean, "b-", label="Full ensemble", linewidth=2.0)
 #    plt.fill_between(ts_sizes, e25, e75, facecolor="blue", alpha=0.5)    
-    bline, = plt.plot(ts_sizes, bmean, "g-", label="Best ensemble")
+    bline, = plt.plot(ts_sizes, bmean, "g-", label="Best ensemble", linewidth=2.0)
 #    plt.fill_between(ts_sizes, b25, b75, facecolor="green", alpha=0.5) 
     
     lines = []
@@ -161,9 +168,9 @@ if __name__ == "__main__":
 #        line, = plt.plot(ts_sizes, place, "-", label="Predicted ensemble on {}".format(i))
 #        lines.append(line)
     
-    plt.ylabel("Mean DTW error, sm")
-    plt.xlabel("Training set size, forecast")
-    plt.legend(handles=[pline, fline, bline]+lines)
+    plt.ylabel("Mean RMS error, cm", fontsize=15)
+    plt.xlabel("Training set size, forecast", fontsize=15)
+    plt.legend(handles = [pline, fline, bline] + lines, fontsize=15)
     plt.show()
     plt.close()
 
@@ -174,8 +181,8 @@ if __name__ == "__main__":
     
     plt.title("Mean error prediction error by training size")
     mean_line, = plt.plot(ts_sizes, pta_mean, "b-", label="Mean")
-    pta_lower =[m-s for m,s in zip(pta_mean, pta_std)]
-    pta_upper =[m+s for m,s in zip(pta_mean, pta_std)]
+    pta_lower = [m-s for m,s in zip(pta_mean, pta_std)]
+    pta_upper = [m+s for m,s in zip(pta_mean, pta_std)]
     plt.fill_between(ts_sizes[2:], pta_lower[2:], pta_upper[2:], 
                          facecolor="blue", alpha=0.5)
     
@@ -189,7 +196,7 @@ if __name__ == "__main__":
     plt.suptitle("Error prediction error by training size for each ensemble ")
     [pta_mean, pta_std, pta_max, pta_min] = zip(*ptas_by_ens)
     for mn, st, mi, mx, i in zip(zip(*pta_mean), zip(*pta_std),
-                         zip(*pta_min), zip(*pta_max), range(7)):
+                         zip(*pta_min), zip(*pta_max), range(8)):
       
         pta_lower =[m-s for m,s in zip(mn, st)]
         pta_upper =[m+s for m,s in zip(mn, st)]             

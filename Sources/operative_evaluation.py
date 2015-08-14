@@ -38,7 +38,7 @@ if __name__ == "__main__":
     coefs = list(read_ens_coeffs(coeffsFile))
      
     cnt = len(noswan)
-    learn_len = 50
+    learn_len = 45
     validate_len = cnt - learn_len
 
     classifier = OMEnsembleClassifier([hiromb, swan, noswan],
@@ -49,9 +49,9 @@ if __name__ == "__main__":
     forecasts = []
     level = []
     
-    operative_time = list(range(50, cnt))    
+    operative_time = list(range(learn_len, cnt))    
     for i in operative_time:  
-        classifier.train(i, 50)
+        classifier.train(i, learn_len)
         pred_fcst, full_fcst = classifier.get_forecasts(i)
         pred, pred_err = classifier.predict_best_ensemble(i)
         full, full_err = classifier.get_biggest_ensemble(i)
@@ -60,14 +60,15 @@ if __name__ == "__main__":
         level.append(best)
                 
         rel_err = full_err - pred_err
-#        if rel_err > 0:
-        if True:
-            swan_rmse = rmse(swan[i], measurements[i*6 : i*6 + 48])
-            hiromb_rmse = rmse(hiromb[i], measurements[i*6 : i*6 + 48])
-            selected_rmse = rmse(pred_fcst, measurements[i*6 : i*6 + 48])
+        errors.append([classifier.get_ensemble(i, n)[1] for n in range(8)]+ [pred_err])
+        if rel_err > 0:
+#        if True:
+#            swan_rmse = rmse(swan[i], measurements[i*6 : i*6 + 48])
+#            hiromb_rmse = rmse(hiromb[i], measurements[i*6 : i*6 + 48])
+#            selected_rmse = rmse(pred_fcst, measurements[i*6 : i*6 + 48])
 #            _, sec_ens_rmse = classifier.get_ensemble(i, 2)
-            full_rmse = rmse(full_fcst, measurements[i*6:i*6+48])
-            errors.append([classifier.get_ensemble(i, n)[1] for n in range(8)]+ [pred_err])
+#            full_rmse = rmse(full_fcst, measurements[i*6:i*6+48])
+            
 #            if swan_rmse >= selected_rmse:
 #            if full_rmse<=swan_rmse:
             forecasts.append((rel_err, measurements[i*6 : i*6 + 48],
@@ -75,21 +76,22 @@ if __name__ == "__main__":
     good_forecasts = list(sorted(forecasts, key = lambda x: x[0]))[-10:]
     
     xs = list(range(len(good_forecasts[0][2])))
-#    for forecast in good_forecasts:
-#        if len(forecast[1]) != len(xs):
-#            continue
-#        plt.figure(figsize=[14, 10])
-#        mline, = plt.plot(xs, forecast[1], "g-", linewidth=4.0, label="Measurments")
-#        seline, = plt.plot(xs, forecast[2], "b-", linewidth=2.0, label = "Selected ensemble")
-#        fline, = plt.plot(xs, forecast[3], "r-", linewidth=2.0, label = "Full ensemble")
-#        hline, = plt.plot(xs, forecast[4], ":", linewidth=2.0, label="HIROMB")
-#        sline, = plt.plot(xs, forecast[5], "--", linewidth=2.0, label="BSM-SWAN")
-#        nsline, = plt.plot(xs, forecast[6], "-.", linewidth=2.0, label="BSM-NOSWAN")
-#        plt.legend(handles=[mline, seline, fline, hline, sline, nsline], fontsize = 15)
-#        plt.xlabel("Time, h", fontsize = 17)
-#        plt.ylabel("Water level, sm", fontsize = 17)
-#        plt.show()
-#        plt.close()
+    for forecast in good_forecasts:
+        if len(forecast[1]) != len(xs):
+            continue
+        plt.figure(figsize=[14, 10])
+        mline, = plt.plot(xs, forecast[1], "ko", linewidth=6.0, label="Measurments")
+        plt.plot(xs, forecast[1], "k-", linewidth=2.0)
+        seline, = plt.plot(xs, forecast[2], "b-", linewidth=2.0, label = "Selected ensemble")
+        fline, = plt.plot(xs, forecast[3], "r-", linewidth=2.0, label = "Full ensemble")
+        hline, = plt.plot(xs, forecast[4], ":", linewidth=2.0, label="HIROMB")
+        sline, = plt.plot(xs, forecast[5], "--", linewidth=2.0, label="BSM-SWAN")
+        nsline, = plt.plot(xs, forecast[6], "-.", linewidth=2.0, label="BSM-NOSWAN")
+        plt.legend(handles=[mline, seline, fline, hline, sline, nsline], fontsize = 15)
+        plt.xlabel("Time, h", fontsize = 17)
+        plt.ylabel("Water level, cm", fontsize = 17)
+        plt.show()
+        plt.close()
         
     errors_by_time = zip(*errors)
     mean_errors = [mean(e) for e in errors_by_time]
@@ -107,6 +109,9 @@ if __name__ == "__main__":
     plt.figure(figsize=[10,10])
     counts, bins, patches = plt.hist(level, bins=8, normed=1, rwidth=0.8, alpha=0.5)
     plt.xticks(range(8))
+    
+    plt.ylabel("")
+    plt.xlabel("Ensemble")    
     
     plt.show()
     plt.close()

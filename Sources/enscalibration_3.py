@@ -44,7 +44,7 @@ def calibrate_ensemble(models, measurements, max_tm=None):
 #            lm = linear_model.LinearRegression()
             
             ensemble_predictors = \
-                    [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]   
+                    [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]
 #            lm.fit(ensemble_predictors, target)
 #            lm.get_params() 
         
@@ -74,8 +74,8 @@ if __name__ == "__main__":
     predictors = [list() for mdl in range(3)]
     target = list()
     #predictors.append([1] * len(predictors[0]))
-    for tm in range(130):#range(int(len(measurements)/6)-8):
-        msm = measurements[tm*6: tm*6 + 48]
+    for tm in range(100):#range(int(len(measurements)/6)-8):
+        msm = measurements[tm*6 : tm*6 + 48]
         for currentPrediction, predictor \
                 in zip([prd[tm] for prd in modelsPredictions], predictors):
 #            print(len(currentPrediction[:48]))
@@ -99,6 +99,5 @@ if __name__ == "__main__":
             coef_str = form_str.format(*coefs)
             ens_coef_file.write(coef_str+"\n")
             print(coef_str)
-            
             
 #            print(lstsq(ensemble_predictors, target)[0])
