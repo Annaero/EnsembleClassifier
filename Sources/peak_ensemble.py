@@ -5,6 +5,7 @@ Created on Wed Sep  2 14:49:33 2015
 @author: Annaero
 """
 import sys, os
+from os.path import join as path_join
 
 import matplotlib.pyplot as plt
 from regres import read_data, read_ens_coeffs
@@ -14,55 +15,55 @@ from utils import window, correct_forecast, calibrate_peak_ensemble,\
                   rmse, detect_peaks, dtw, find_corresponding_peak
 from EnsembleClassifier import ensemble_predictions
      
+from enscalibration import MODELS     
+     
 if __name__=="__main__":
     path = sys.argv[1]
     path2 = sys.argv[2]
     MODEL = "GI"
     
-    measurementsFile = os.path.join(path,"measurements")
-    noswanFile = os.path.join(path, "BSM-BS-HIRLAM")
-    swanFile = os.path.join(path, "BSM-WOWC-HIRLAM")
-    hirombFile = os.path.join(path, "HIROMB")
-    coeffsFile = os.path.join(path, "ens_coefs.txt")
-    peakCoeffsFile = os.path.join(path, "peak_ens_coefs.txt")
+    measurementsFile = path_join(path,"measurements")
+    models_files = [path_join(path, model) for model in MODELS]
+    coeffsFile = path_join(path, "ens_coefs.txt")
+    peakCoeffsFile = path_join(path, "peak_ens_coefs.txt")
     
     measurements = read_data(measurementsFile)
-    noswan = read_data(noswanFile)
-    swan = read_data(swanFile)
-    hiromb = read_data(hirombFile)
     coeffs = list(read_ens_coeffs(coeffsFile))
 #    peak_coeffs = list(read_ens_coeffs(peakCoeffsFile))
     
-    models = [hiromb, swan, noswan]
+    models_count = len(MODELS)
+    models = [read_data(model_file) for model_file in models_files]
     forecasts = ensemble_predictions(models, coeffs[-1])
     
     err = rmse    
     
-    cnt = len(noswan)
+    cnt = len(models[0])
     mean_errors = []
-    for thr in range (2, 48):
+    H_errors = []
+    T_errors = []
+    max_thr = 35
+    for thr in range (2, max_thr):
         rmses = []
         peaks_on = []
         for i in range(cnt):
             msm = measurements[i*6:i*6+48]
             forecast = forecasts[i]
             forecast_error = err(forecast, msm)        
-            if len(peaks_on) >= thr:
-                window_models = [list(), list(), list()]
+            if len(peaks_on) >= max_thr:
+                window_models = [list() for m in range(models_count)]
                 t_msm = []
                 for p in peaks_on[-thr:]:
-                    window_models[0].append(hiromb[p])
-                    window_models[1].append(swan[p])
-                    window_models[2].append(noswan[p])
+                    for m in range(models_count):
+                        window_models[m].append(models[m][p])
                     t_msm.extend(measurements[p*6:p*6+48])
                 peak_coeffs = calibrate_peak_ensemble(window_models, t_msm)
-                corrected_forecast = correct_forecast(forecast, [hiromb[i], swan[i], noswan[i]], peak_coeffs)
+                corrected_forecast = correct_forecast(forecast, [f[i] for f in models], peak_coeffs)
                 corrected_error = err(corrected_forecast, msm)
             else:
                 corrected_error = forecast_error
                 
 #            xs = range(len(msm))
-#            if corrected_error < forecast_error:                 
+#            if corrected_error > forecast_error:                 
 #                plt.figure(figsize=[14, 10])
 #                mline, = plt.plot(xs, msm, "ko", linewidth=6.0, label="Measurments")
 #                plt.title("{} forecast".format(i))            
@@ -93,6 +94,7 @@ if __name__=="__main__":
             
         
     corr_errors = list(zip(*mean_errors))[1]
-    plt.plot(range (2, 48), corr_errors)
+    plt.plot(range (2, max_thr), corr_errors)
+    plt.plot([2, max_thr], [mean_errors[-1][0], mean_errors[-1][0]])
         
     

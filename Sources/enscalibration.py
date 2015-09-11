@@ -30,12 +30,12 @@ from numpy.linalg import lstsq
 TABED_MODELS = ["BSM-BS-HIRLAM", "BALTP-90M-GFS", "BALTP-90M-HIRLAM",
                 "BSM-WOWC-HIRLAM", "HIROMB"]
 
-#MODELS = ["BALTP_FORCE_2m", "BALTP_FORCE_90m", "BALTP_GFS60_2m",
-#          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP-90M-GFS",
-#          "BSM_FORCE_WowcSwanAss", "BSM-BS-HIRLAM"]
+MODELS = ["BALTP_FORCE_2m", "BALTP_FORCE_90m", "BALTP_GFS60_2m",
+          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP-90M-GFS",
+          "BSM_FORCE_WowcSwanAss", "BSM-BS-HIRLAM"]
 
-#MODELS = ["BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
-MODELS = ["HIROMB", "BSM-WOWC-HIRLAM", "BSM-BS-HIRLAM"]
+MODELS = ["BALTP_GFS60_90m",  "BSM-WOWC-HIRLAM", "BSM_GFS60_BankeSmithAss", "BALTP_HIRLAM_2m", "HIROMB"]
+#MODELS = ["HIROMB", "BSM-WOWC-HIRLAM", "BSM-BS-HIRLAM"]
           
           
 DTFORMAT = "%Y-%m-%d %H:%M:%S"
@@ -185,7 +185,7 @@ if __name__ == "__main__":
                 aligned_model_file.write(predStr)
                 aligned_model_file.write("\n")
                 
-    with open(os.path.join(path_to_aligned, "mesur"), "w+") as aligned_mes_file:
+    with open(os.path.join(path_to_aligned, "measurements"), "w+") as aligned_mes_file:
         print(times[0])
         print(times[-1])
         print(get_msm_index(times[0]))

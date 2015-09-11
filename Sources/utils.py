@@ -147,12 +147,13 @@ def correct_forecast(ensemble_forecast, models_forecasts,
                               ensemble_peaks)) for forecast_peaks in forecasts_peaks]
                               
     correctors = []
-    for measured, *corresponding in zip(ensemble_peaks, *forecasts_peaks_cor):
+    for ensemble, *corresponding in zip(ensemble_peaks, *forecasts_peaks_cor):
+        corrector = (None, None)        
         if all(corresponding):
             T, H = _peak_ensemble(corresponding, peak_ensemble_coeffs)
-            correctors.append((T,H))
-        else:
-            correctors.append((None, None))
+            if ensemble[0] <= T <=ensemble[1]:
+                correctors.append((T,H))
+        correctors.append(corrector)
             
     corrected_forecast = correct_forecast_peaks(ensemble_forecast, correctors)
     return corrected_forecast
