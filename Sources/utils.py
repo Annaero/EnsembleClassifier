@@ -98,7 +98,6 @@ def calibrate_peak_ensemble(models_forecasts, measurements, forecast_len = 48, p
                 H_target.append(measured[3])
                 T_target.append(measured[2])
 
-#    print(H_target)
     H_coefs = lstsq(H_predictors, H_target)[0]
     T_coefs = lstsq(T_predictors, T_target)[0]
     return list(T_coefs), list(H_coefs)
@@ -149,13 +148,11 @@ def correct_forecast(ensemble_forecast, models_forecasts,
                               
     correctors = []
     for measured, *corresponding in zip(ensemble_peaks, *forecasts_peaks_cor):
-#        print(corresponding)
         if all(corresponding):
             T, H = _peak_ensemble(corresponding, peak_ensemble_coeffs)
             correctors.append((T,H))
         else:
             correctors.append((None, None))
-#    print(correctors)
             
     corrected_forecast = correct_forecast_peaks(ensemble_forecast, correctors)
     return corrected_forecast
@@ -180,7 +177,6 @@ def correct_forecast_peaks(ensemble_forecast, correctors, peak_level = 80):
         t_corrector = T/eT
         peak = ensemble_forecast[u:d]
         corrected_levels = list(map(lambda x : x * h_corrector, peak))
-#        print(list(corrected_levels))
 
         times = range(u, d)# + 1)
         corrected_times = map(lambda x : x * t_corrector, times)
