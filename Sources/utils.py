@@ -11,7 +11,7 @@ from itertools import product
 from dtw import dtw as lib_dtw
 
 from numpy.linalg import lstsq
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 #Reciept from itertools documentation
 def window(seq, n=2, step=1):
@@ -36,6 +36,11 @@ def dtw(predicted, actual):
     ln = min(len(predicted), len(actual))
     dist, cost, path = lib_dtw(predicted[:ln], actual[:ln])
     return dist
+    
+def mae(actual, predicted):
+    ln = min(len(predicted), len(actual))
+    rmse = sqrt(mean_absolute_error(actual[:ln], predicted[:ln]))
+    return rmse
 
 def calibrate_ensemble(models_forecasts, measurements, forecast_len = 48):
     """Calculates coefficient for models in ensembles usulg OLS.
@@ -89,9 +94,9 @@ def calibrate_peak_ensemble(models_forecasts, measurements, forecast_len = 48, p
         forecasts = [prd[tm] for prd in models_forecasts]
         forecasts_peaks = [detect_peaks(fcst, peak_level) for fcst in forecasts]
         
-        forecasts_peaks_cor = [list(map(lambda x: find_corresponding_peak(x, forecast_peaks),
+        corresponding_peaks = [list(map(lambda x: find_corresponding_peak(x, forecast_peaks),
                                       measured_peaks)) for forecast_peaks in forecasts_peaks]
-        for measured, *corresponding in zip(measured_peaks, *forecasts_peaks_cor):
+        for measured, *corresponding in zip(measured_peaks, *corresponding_peaks):
             if all(corresponding):
                 H_predictors.append([peak[3] for peak in corresponding] + [1])
                 T_predictors.append([peak[2] for peak in corresponding] + [1])
@@ -143,11 +148,11 @@ def correct_forecast(ensemble_forecast, models_forecasts,
         ensemble_forecast
 
     forecasts_peaks = [detect_peaks(fcst, peak_level) for fcst in models_forecasts]
-    forecasts_peaks_cor = [list(map(lambda x: find_corresponding_peak(x, forecast_peaks),
+    corresponding_peaks = [list(map(lambda x: find_corresponding_peak(x, forecast_peaks),
                               ensemble_peaks)) for forecast_peaks in forecasts_peaks]
                               
     correctors = []
-    for ensemble, *corresponding in zip(ensemble_peaks, *forecasts_peaks_cor):
+    for ensemble, *corresponding in zip(ensemble_peaks, *corresponding_peaks):
         corrector = (None, None)        
         if all(corresponding):
             T, H = _peak_ensemble(corresponding, peak_ensemble_coeffs)
@@ -190,8 +195,6 @@ def correct_forecast_peaks(ensemble_forecast, correctors, peak_level = 80):
         corrected_forecast[u:d] = corrected_peak
     return corrected_forecast
 
-
-    
 def _find_corrected_level(time, points):
     for c_time, c_level in points:
         if c_time == time:
@@ -204,3 +207,17 @@ def _find_corrected_level(time, points):
         c_time1, c_level1 = points[idx-1]
         return c_level+(time-c_time)*(c_level1-c_level)/(c_time1-c_time)
     return points[-1][1]
+    
+def calculate_peaks_errors(measurements, forecast, peak_level = 80):   
+    measured_peaks = detect_peaks(measurements, peak_level)
+    forecast_peaks = detect_peaks(forecast, peak_level)
+    corresponding_peaks = list(map(lambda x: find_corresponding_peak(x, forecast_peaks),
+                                  measured_peaks))
+                                  
+    errors = []
+    for measured, forecasted in zip(measured_peaks, corresponding_peaks):
+        if forecasted:
+            T_error = abs(measured[2] - forecasted[2])
+            H_error = abs(abs(measured[3] - forecasted[3]))
+            errors.append((T_error, H_error))
+    return errors
