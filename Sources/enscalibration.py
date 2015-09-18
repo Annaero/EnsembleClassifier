@@ -12,13 +12,14 @@ import matplotlib.pyplot as plt
 
 from collections import OrderedDict
 from dateutil import parser
-from math import sqrt
-from dtw import dtw
 from dateutil.rrule import rrule, HOURLY
 from sklearn import linear_model
+from numpy.linalg import lstsq
 
 from itertools import product
 from numpy.linalg import lstsq
+
+from utils import calibrate_ensemble, calibrate_peak_ensemble
 
 #MODELS = ["BALTP_FORCE_2m", "BALTP_FORCE_90m", "BALTP_GFS60_2m", 
 #          "BALTP_GFS60_90m", "BALTP_GFS192_2m", "BALTP_HIRLAM_2m",
@@ -66,7 +67,7 @@ def get_msm_index(dt):
     tdelta = dt - MSM_BEGINING
     return int(tdelta.total_seconds() / 3600)
     
-def read_predictions(path, model, point):  
+def read_forecasts(path, model, point):  
     print(model)
     filePath = os.path.join(path, point, "{0}-{1}.txt".format(model, point))  
     
@@ -91,8 +92,6 @@ def read_predictions(path, model, point):
             predictLen = len(tokens[2:])
     return predictions, times, predictLen
     
-#def get_combinations(models):
-    
     
 if __name__ == "__main__":
     path = sys.argv[1]
@@ -104,115 +103,77 @@ if __name__ == "__main__":
     POINT = "S1"
     POINT_MSM = S1
 
-    modelsPredictions = list()
-    modelTimes = list()
-    predictLengths = list()
+    models_forecasts_full = list()
+    modeling_times = list()
+    forecast_lengths = list()
     for model in MODELS:
-        predictions, times, predictLen = read_predictions(path, model, POINT)
-        modelsPredictions.append(predictions)
-        modelTimes.append(times)
-        predictLengths.append(predictLen)
+        forecasts, times, forecast_len = read_forecasts(path, model, POINT)
+        models_forecasts_full.append(forecasts)
+        modeling_times.append(times)
+        forecast_lengths.append(forecast_len)
         
     #Get max prediction length
-    minPredLen = min(predictLengths)
+    minPredLen = min(forecast_lengths)
 
-    #Append free component
-    #modelsPredictions.insert(0, [1]*minPredLen)
-       
-    #Get time period avaible for files
-    minTime = max([times[0] for times in modelTimes])
-    maxTime = min([times[-1] for times in modelTimes])
-    times = list(rrule(HOURLY, interval=6, dtstart=minTime, until=maxTime))
+    minTime = max([times[0] for times in modeling_times])
+    maxTime = min([times[-1] for times in modeling_times])
+    times = list(rrule(HOURLY, interval = 6, dtstart=minTime, until=maxTime))
  
     predictors = [list() for mdl in MODELS]
     target = list()
-    for tm in times:
-        msmIndex = get_msm_index(tm)
-        msm = POINT_MSM[msmIndex : msmIndex + minPredLen]
-        target_len = len(msm)
-        
-        for currentPrediction, predictor \
-                in zip([prd[tm] for prd in modelsPredictions], predictors):
-            predictor.extend(currentPrediction[:target_len])
-        target.extend(msm)
+    
+    bg = get_msm_index(times[0])
+    measurements = POINT_MSM[bg:]
+    
+    models_forecasts = list(map(lambda model: [model[tm] for tm in times], models_forecasts_full))
+    
+#    for tm in times:
+#        msmIndex = get_msm_index(tm)
+#        msm = POINT_MSM[msmIndex : msmIndex + minPredLen]
+#        target_len = len(msm)
+#        
+#        for currentPrediction, predictor \
+#                in zip([prd[tm] for prd in models_forecasts], predictors):
+#            predictor.extend(currentPrediction[:target_len])
+#        target.extend(msm)
              
-    
-#    modelsPredictions = [hiromb, swan, noswan]    
-    
         
-    #predictors.append([1] * len(predictors[0]))
+    #def calibrate_ensemble(models_forecasts, ):        
         
-    print(*MODELS)
-    with open(os.path.join(path_to_aligned, "ens_coefs.txt"), "w+") as ens_coef_file:
-        for ens_map in reversed(list(product([1,0], repeat = len(MODELS)))):
-            lm = linear_model.LinearRegression()
-            
-            ensemble_predictors = \
-                    [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]   
-            lm.fit(ensemble_predictors, target)
-            lm.get_params() 
-        
-            coefs = list(lm.coef_) + [lm.intercept_]
-            form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(0, len(MODELS)+1)])
+    # Find ensembles coefficients and save them to file
+    save_coefs_to = os.path.join(path_to_aligned, "ens_coefs.txt")
+    with open(save_coefs_to, "w+") as ens_coef_file:
+        for coefs in calibrate_ensemble(models_forecasts, measurements):
+            form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(len(MODELS) + 1)])
             coef_str = form_str.format(*coefs)
-            ens_coef_file.write(coef_str+"\n")
+            ens_coef_file.write(coef_str + "\n")
             print(coef_str)
             
-            ensemble_predictors = [pred+[1] for pred in ensemble_predictors]
-#            print(lstsq(ensemble_predictors, target)[0])
+    with open(os.path.join(path_to_aligned, "peak_ens_coefs.txt"), "w+") as peak_ens_coef_file:
+        t, h = calibrate_peak_ensemble(models_forecasts, measurements)
+        t_coef_str = form_str.format(*t)
+        peak_ens_coef_file.write(t_coef_str + "\n")
+        h_coef_str = form_str.format(*h)
+        peak_ens_coef_file.write(h_coef_str + "\n")
             
-#            if ens_map==(1,1,1):
-#                model_predictions = list(zip(*ensemble_predictors))
-#                plt.figure()
-#                plt.scatter(model_predictions[1], target)
-#                plt.show()
-#                
-#                plt.figure()
-#                plt.scatter(model_predictions[0], target)
-#                plt.show()
-#                
-#                plt.figure()
-#                plt.scatter(model_predictions[2], target)
-#                plt.show()
+        print(t_coef_str+"\n"+h_coef_str)
             
-    for model, predictions in zip(MODELS, modelsPredictions):
+#            ensemble_predictors = [pred + [1] for pred in ensemble_predictors]
+
+    # Save forecasts aligned by time to new files
+    for model, forecasts in zip(MODELS, models_forecasts):
         if not os.path.exists(path_to_aligned):
             os.makedirs(path_to_aligned)
                 
         with open(os.path.join(path_to_aligned, model), "w+") as aligned_model_file:
-            for tm in times:
-                predStr = "\t".join([str(p) for p in predictions[tm]])
+            for forecast in forecasts:
+                predStr = "\t".join([str(p) for p in forecast])
                 aligned_model_file.write(predStr)
                 aligned_model_file.write("\n")
                 
-    with open(os.path.join(path_to_aligned, "mesur"), "w+") as aligned_mes_file:
-        print(times[0])
-        print(times[-1])
-        print(get_msm_index(times[0]))
-        print(get_msm_index(times[-1]))
-        msms = POINT_MSM[get_msm_index(times[0]):get_msm_index(times[-1])+predictLen]
+    #Save measurment aligned by time
+    save_measurments_to = os.path.join(path_to_aligned, "measurments") 
+    with open(save_measurments_to, "w+") as aligned_mes_file:
+        msms = POINT_MSM[get_msm_index(times[0]):get_msm_index(times[-1]) + forecast_len]
         msms_str = "\n".join([str(m) for m in msms])        
         aligned_mes_file.write(msms_str)
-#            aligned_model_file.write("\n")
-        
-    
-    ### list(itertools.product([1,0], repeat=4))
-        
-    
-#    msmIndex = get_msm_index(times[0])
-#    meserments = S1[msmIndex:]
-#    
-#    i = 10
-#
-#    pred = prediction[times[i]] 
-#    msm = meserments[i*6:i*6+len(pred)]
-#    
-#    pyplot.figure()
-#
-#    pyplot.plot(range(len(msm)), msm, color="green")
-#    pyplot.plot(range(len(pred)), pred, color="red")
-#    print(dist_mesurement(msm, pred))
-#    
-#    pyplot.show()
-#    pyplot.close()
-    

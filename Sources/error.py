@@ -24,6 +24,7 @@ from numpy import percentile, std
 from collections import defaultdict
 
 from enscalibration_3 import calibrate_ensemble
+from sklearn.metrics import mean_squared_error
 
 from math import sqrt
         

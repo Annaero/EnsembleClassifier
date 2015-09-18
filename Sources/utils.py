@@ -98,7 +98,8 @@ def calibrate_peak_ensemble(models_forecasts, measurements, forecast_len = 48, p
                 H_target.append(measured[3])
                 T_target.append(measured[2])
 
-#    print(H_target)
+    print(H_predictors, H_target)
+
     H_coefs = lstsq(H_predictors, H_target)[0]
     T_coefs = lstsq(T_predictors, T_target)[0]
     return list(T_coefs), list(H_coefs)

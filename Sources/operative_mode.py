@@ -2,12 +2,10 @@
 import sys
 import os.path
 import matplotlib.pyplot as plt
-import numpy as np
-from scipy.stats import norm
 from EnsembleClassifier import EnsembleClassifier, OMEnsembleClassifier
 from regres import read_data, read_ens_coeffs
 from SelectionStrategy import NoneStrategy     
-from statistics import median, mean  
+from statistics import  mean  
 from sklearn.metrics import mean_squared_error
 from math import sqrt
        
@@ -40,35 +38,49 @@ if __name__ == "__main__":
     validate_len = cnt - learn_len
 
     classifier = OMEnsembleClassifier([hiromb, swan, noswan], 
-                                      coefs, measurements)#,  error_measurement=rmse)
-    classifier.prepare(1)
-        
-    errors = []
-    ml_errors = []
-    pta_errors = [] #predicted-to-actual
-    level = []
-    strategy = NoneStrategy(classifier)
-    operative_time = list(range(learn_len, cnt))       
+                                      coefs, measurements,  error_measurement=rmse)
     
-    for i in operative_time:
-#        training_set = range(i - learn_len, i-1)
+    ml_errors_by_point = []  
+    for points in range(1, 10):    
+        classifier.prepare(points)
             
-        classifier.train(i, learn_len)
-#        classifier.train(training_set)
-        ml, mlErr = classifier.predict_best_ensemble(i)
-        best, bestErr = classifier.get_best_ensemble(i)
-        ens, ensErr = classifier.get_biggest_ensemble(i) 
-        errors.append((bestErr, ensErr, mlErr))
-        ml_errors.append(mlErr)
-            
-#        strategy.retrain_classifier(i)
-#        err = strategy.get_next_ensemble(i)
-        pta = classifier.get_predict_to_actual_error(i)
-#        errors.append(err[:3])
-#        ml_errors.append(err[-2])
-        pta_errors.append(pta)
+        errors = []
+        ml_errors = []
+        pta_errors = [] #predicted-to-actual
+        level = []
+        strategy = NoneStrategy(classifier)
+        operative_time = list(range(learn_len, cnt))  
+       
+        
+        for i in operative_time:
+    #        training_set = range(i - learn_len, i-1)
                 
-        level.append(ml)
+            classifier.train(i, learn_len)
+    #        classifier.train(training_set)
+            ml, mlErr = classifier.predict_best_ensemble(i)
+            best, bestErr = classifier.get_best_ensemble(i)
+            ens, ensErr = classifier.get_biggest_ensemble(i) 
+            errors.append((bestErr, ensErr, mlErr))
+            ml_errors.append(mlErr)
+                
+    #        strategy.retrain_classifier(i)
+    #        err = strategy.get_next_ensemble(i)
+            pta = classifier.get_predict_to_actual_error(i)
+    #        errors.append(err[:3])
+    #        ml_errors.append(err[-2])
+            pta_errors.append(pta)
+                    
+            level.append(ml)
+        ml_errors_by_point.append(mean(ml_errors))
+    
+    plt.figure(figsize=[5,5])
+    plt.plot(range(1,10), ml_errors_by_point, "o-")
+    plt.xlim([0,10])
+    plt.ylim([15.5, 17])
+    plt.xlabel("Number of regression members", fontsize=15)
+    plt.ylabel("Mean RMS error, cm", fontsize=15) 
+    plt.show()
+    
             
     errors_by_time = list(zip(*errors))
 #        tmp.append(errors_by_time)
@@ -78,26 +90,35 @@ if __name__ == "__main__":
 #        css.append(classifier)
 #    errs.append(ml_errors)
     
-    plt.figure(figsize=[15,13])
-    plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
-    for ens, i in zip(pta_by_ens[1:], range(1,8)):                
-        plt.subplot(3,3,i)
-        models = ["HIROMB", "BSM-SWAN", "BSM-NOSWAN"]
-        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=17)
-
-#        plt.xlabel("Predicted RMSE, cm")
-#        plt.ylabel("Actual RMSE, cm")
-        
-        mmax = 15        
-        
-        plt.xlim(0 ,mmax)
-        plt.ylim(0, mmax)
-        
-        [p,a] = list(zip(*ens))
-        plt.plot([0, mmax], [0, mmax], c="0.5")
-        plt.plot(p, a, "*", c="b")        
-    plt.show()
+#    plt.figure(figsize=[15,13])
+#    plt.suptitle("Predicted-to-actual error biplots", fontsize=15)
+#    for ens, i in zip(pta_by_ens[1:], range(1,8)):                
+#        plt.subplot(3,3,i)
+#        models = ["HIROMB", "BSM-SWAN", "BSM-NOSWAN"]
+#        plt.title(", ".join([models[m] for m in range(len(models)) if coefs[i][m]]), fontsize=17)
+#
+##        plt.xlabel("Predicted RMSE, cm")
+##        plt.ylabel("Actual RMSE, cm")
+#        
+#        mmax = 15        
+#        
+#        plt.xlim(0 ,mmax)
+#        plt.ylim(0, mmax)
+#        
+#        [p,a] = list(zip(*ens))
+#        plt.plot([0, mmax], [0, mmax], c="0.5")
+#        plt.plot(p, a, "*", c="b")        
+#    plt.show()
     
+    [_, e, m] = list(zip(*errors))
+    plt.figure(figsize=(7,7))
+    plt.scatter(e,m)
+    plt.xlim(0,30)
+    plt.ylim(0,30)
+    plt.plot([0,30],[0,30], "k-", linewidth=1.0)
+    plt.xlabel("Full ensemble RMS error, cm", fontsize=17)
+    plt.ylabel("Selected ensemble RMS error, cm", fontsize=17)
+    plt.show()
 
 #    plt.figure(figsize=(15,12))      
 #    
@@ -132,7 +153,8 @@ if __name__ == "__main__":
     plt.ylabel("RMSE", fontsize=17)
     
 #    plt.axhline(mean(errors_by_time[2]), linestyle="--")
-    plt.yticks(range(0,12))
+#    plt.yticks(range(0,35))
+    plt.ylim([0, 35])
     plt.show()
     plt.close()
     

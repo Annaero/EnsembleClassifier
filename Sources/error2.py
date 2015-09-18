@@ -12,7 +12,6 @@ from SelectionStrategy import NoneStrategy
 from sklearn.cross_validation import ShuffleSplit
 from math import sqrt
 
-
 def read_data(fileName):
     data = list()
     with open(fileName, "r") as dataFile:
@@ -118,7 +117,7 @@ if __name__ == "__main__":
     ens_line.set_antialiased(True)    
     
     plt.ylabel("Mean error", fontsize=15)
-    plt.xlabel("Time", fontsize=15)    
+    plt.xlabel("Time", fontsize=15)
     
     plt.legend(handles=[ml_line, ens_line, best_lb], fontsize=12)
     plt.title("Operative mode simulation with training set size=70", fontsize=15) 

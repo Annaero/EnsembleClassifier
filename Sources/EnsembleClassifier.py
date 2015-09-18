@@ -239,7 +239,6 @@ class OMEnsembleClassifier(EnsembleClassifier):
             
             pm.fit(predictor_points, predicate)
 
-            
 class AssimilationEnsembleClassifier(EnsembleClassifierBase):
     def __init__(self, models, coefs, measurements, error_measurement = dtw_measurement):
         super(AssimilationEnsembleClassifier, self).__init__(models, coefs, measurements, error_measurement)    
@@ -260,7 +259,7 @@ class AssimilationEnsembleClassifier(EnsembleClassifierBase):
     def predict_best_ensemble(self, t):    
         X = self._get_x(t)
         distanses = list(self.__known_dist_by_time[t])
-        predicted_errors = [pm.predict(X+[d]) for pm, d in zip(self._prediction_models, distanses)]
+        predicted_errors = [pm.predict(X + [d]) for pm, d in zip(self._prediction_models, distanses)]
         predicted_ensemble = predicted_errors.index(min(predicted_errors))
         
         actual_error = self._errors_by_ens[predicted_ensemble][t]

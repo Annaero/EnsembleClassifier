@@ -1,56 +1,12 @@
 import sys
 import os.path
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.stats import norm
-from EnsembleClassifier import EnsembleClassifier, OMEnsembleClassifier, dtw_measurement as dtw
-from regres import read_data, read_ens_coeffs
-from SelectionStrategy import NoneStrategy     
-from statistics import median, mean  
-from math import sqrt  
-from sklearn.metrics import mean_squared_error
-from collections import OrderedDict
-from dateutil import parser
-from dtw import dtw
-from dateutil.rrule import rrule, HOURLY
-from sklearn import linear_model
+
+from utils import rmse, calibrate_ensemble, calibrate_peak_ensemble
 
 from itertools import product
 from numpy.linalg import lstsq
-       
-def rmse(actual, predicted):
-    ln = min(len(predicted), len(actual))
-    rmse = sqrt(mean_squared_error(actual[:ln], predicted[:ln]))
-    return rmse   
-    
-def calibrate_ensemble(models, measurements, max_tm=None):
-    modelsPredictions = models  
-      
-    predictors = [list() for mdl in range(3)]
-    target = list()
-    #predictors.append([1] * len(predictors[0]))
-    rng = max_tm if max_tm else len(models[0])
-    for tm in range(rng):
-        msm = measurements[tm*6: tm*6 + 48]
-        for currentPrediction, predictor \
-                in zip([prd[tm] for prd in modelsPredictions], predictors):
-#            print(len(currentPrediction[:48]))
-            predictor.extend(currentPrediction[:48])
-#        print(len(msm`))
-        target.extend(msm)
-        
-#    print(*MODELS)
-        for ens_map in reversed(list(product([1,0], repeat = 3))):
-#            lm = linear_model.LinearRegression()
-            
-            ensemble_predictors = \
-                    [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]
-#            lm.fit(ensemble_predictors, target)
-#            lm.get_params() 
-        
-            ensemble_predictors = [pred+[1] for pred in ensemble_predictors]
-            coefs = lstsq(ensemble_predictors, target)[0]
-            yield coefs
+
+from regres import read_data
     
 if __name__ == "__main__":
     path = sys.argv[1]
@@ -68,36 +24,22 @@ if __name__ == "__main__":
     noswan = read_data(noswanFile)
     swan = read_data(swanFile)
     hiromb = read_data(hirombFile)
+    hiromb = [[h-34 for h in forecast] for forecast in hiromb]
 
-    modelsPredictions = [hiromb, swan, noswan]    
-      
-    predictors = [list() for mdl in range(3)]
-    target = list()
-    #predictors.append([1] * len(predictors[0]))
-    for tm in range(100):#range(int(len(measurements)/6)-8):
-        msm = measurements[tm*6 : tm*6 + 48]
-        for currentPrediction, predictor \
-                in zip([prd[tm] for prd in modelsPredictions], predictors):
-#            print(len(currentPrediction[:48]))
-            predictor.extend(currentPrediction[:48])
-#        print(len(msm))
-        target.extend(msm)
-        
-#    print(*MODELS)
+    models_forecasts = [hiromb, swan, noswan]    
+    form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(4)])     
+     
     with open(os.path.join(path2, "ens_coefs.txt"), "w+") as ens_coef_file:
-        for ens_map in reversed(list(product([1,0], repeat = 3))):
-#            lm = linear_model.LinearRegression()
-            
-            ensemble_predictors = \
-                    [[a*b for a,b in zip(point, ens_map)] for point in zip(*predictors)]   
-#            lm.fit(ensemble_predictors, target)
-#            lm.get_params() 
-        
-            ensemble_predictors = [pred+[1] for pred in ensemble_predictors]
-            coefs = lstsq(ensemble_predictors, target)[0]
-            form_str = "\t".join(["{{{0}:.3f}}".format(i) for i in range(4)])
+        for coefs in calibrate_ensemble(models_forecasts, measurements):
             coef_str = form_str.format(*coefs)
             ens_coef_file.write(coef_str+"\n")
             print(coef_str)
             
-#            print(lstsq(ensemble_predictors, target)[0])
+    with open(os.path.join(path2, "peak_ens_coefs.txt"), "w+") as peak_ens_coef_file:
+        t, h = calibrate_peak_ensemble(models_forecasts, measurements)
+        t_coef_str = form_str.format(*t)
+        peak_ens_coef_file.write(t_coef_str + "\n")
+        h_coef_str = form_str.format(*h)
+        peak_ens_coef_file.write(h_coef_str + "\n")
+            
+        print(t_coef_str+"\n"+h_coef_str)
